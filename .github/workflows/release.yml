@@ -31,5 +31,5 @@ jobs:
 
           gh release create "$tag" \
             --title="$tag" \
-            --draft \
+            --generate-notes \
             ./dist/build/main.js ./dist/build/manifest.json ./dist/build/styles.css
