@@ -99,6 +99,8 @@ import {
 import { CollectAttachmentsEntireVaultCommand } from './Commands/CollectAttachmentsEntireVaultCommand.ts';
 import { CollectAttachmentsInCurrentFolderCommand } from './Commands/CollectAttachmentsInCurrentFolderCommand.ts';
 import { CollectAttachmentsInFileCommand } from './Commands/CollectAttachmentsInFileCommand.ts';
+import { ExtractBase64ImagesEntireVaultCommand } from './Commands/ExtractBase64ImagesEntireVaultCommand.ts';
+import { ExtractBase64ImagesInFileCommand } from './Commands/ExtractBase64ImagesInFileCommand.ts';
 import { MoveAttachmentToProperFolderCommand } from './Commands/MoveAttachmentToProperFolderCommand.ts';
 import { translationsMap } from './i18n/locales/translationsMap.ts';
 import {
@@ -132,6 +134,7 @@ type InsertFilesFn = ClipboardManager['insertFiles'];
 type SaveAttachmentFn = App['saveAttachment'];
 
 const PASTED_IMAGE_NAME_REG_EXP = /Pasted image (?<Timestamp>\d{14})/;
+const WINDOWS_PASTED_IMAGE_REG_EXP = /^image(?: \d+)?$/;
 const PASTED_IMAGE_DATE_FORMAT = 'YYYYMMDDHHmmss';
 const THRESHOLD_IN_SECONDS = 10;
 const IMPORT_FILES_PREFIX = '__IMPORT_FILES__';
@@ -280,6 +283,8 @@ export class Plugin extends PluginBase<PluginTypes> {
     new CollectAttachmentsInFileCommand(this).register();
     new CollectAttachmentsInCurrentFolderCommand(this).register();
     new CollectAttachmentsEntireVaultCommand(this).register();
+    new ExtractBase64ImagesInFileCommand(this).register();
+    new ExtractBase64ImagesEntireVaultCommand(this).register();
     new MoveAttachmentToProperFolderCommand(this).register();
 
     registerPatch(this, this.app, {
@@ -669,12 +674,12 @@ export class Plugin extends PluginBase<PluginTypes> {
     return next.call(this.app.shareReceiver, files);
   }
 
-  private async insertFiles(next: InsertFilesFn, clipboardManager: ClipboardManager, importedAttachments: ImportedAttachment[]): Promise<void> {
-    for (const importedAttachment of importedAttachments) {
-      const arrayBuffer = await importedAttachment.data;
-      await this.setFileStat(arrayBuffer, importedAttachment.filepath);
+  protected async insertFiles(next: InsertFilesFn, manager: ClipboardManager, files: ImportedAttachment[]): Promise<void> {
+    for (const file of files) {
+      const data = await file.data;
+      await this.setFileStat(data, file.filepath);
     }
-    return next.call(clipboardManager, importedAttachments);
+    return next.call(manager, files);
   }
 
   private async saveAttachment(
@@ -688,7 +693,7 @@ export class Plugin extends PluginBase<PluginTypes> {
     }
 
     let isPastedImage = false;
-    const match = PASTED_IMAGE_NAME_REG_EXP.exec(attachmentFileBaseName);
+    let match = PASTED_IMAGE_NAME_REG_EXP.exec(attachmentFileBaseName);
     if (match) {
       const timestampString = match.groups?.['Timestamp'];
       if (timestampString) {
@@ -699,6 +704,9 @@ export class Plugin extends PluginBase<PluginTypes> {
           }
         }
       }
+    } else if (WINDOWS_PASTED_IMAGE_REG_EXP.test(attachmentFileBaseName)) {
+      // Windows clipboard typically provides 'image.png' or 'image 1.png' etc.
+      isPastedImage = true;
     }
 
     const convertImageToJpegOptions: ConvertImageToJpegOptions = {
