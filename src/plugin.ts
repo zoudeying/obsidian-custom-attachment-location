@@ -19,6 +19,8 @@ import { AttachmentSaver } from './attachment-saver.ts';
 import { CollectAttachmentsEntireVaultCommandHandler } from './command-handlers/collect-attachments-entire-vault-command-handler.ts';
 import { CollectAttachmentsInCurrentFolderCommandHandler } from './command-handlers/collect-attachments-in-current-folder-command-handler.ts';
 import { CollectAttachmentsInFileCommandHandler } from './command-handlers/collect-attachments-in-file-command-handler.ts';
+import { ExtractBase64ImagesEntireVaultCommandHandler } from './command-handlers/extract-base64-images-entire-vault-command-handler.ts';
+import { ExtractBase64ImagesInFileCommandHandler } from './command-handlers/extract-base64-images-in-file-command-handler.ts';
 import { MoveAttachmentToProperFolderCommandHandler } from './command-handlers/move-attachment-to-proper-folder-command-handler.ts';
 import { CustomAttachmentLocationComponent } from './custom-attachment-location-component.ts';
 import { translationsMap } from './i18n/locales/translations-map.ts';
@@ -171,6 +173,12 @@ export class Plugin extends PluginBase {
             pluginNoticeComponent: this.pluginNoticeComponent,
             pluginSettingsComponent,
             resourceLockComponent: this.resourceLockComponent
+          }),
+          new ExtractBase64ImagesInFileCommandHandler({
+            plugin: this
+          }),
+          new ExtractBase64ImagesEntireVaultCommandHandler({
+            plugin: this
           })
         ],
         commandRegistrar: new PluginCommandRegistrar(this),
