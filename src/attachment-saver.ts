@@ -40,6 +40,7 @@ interface AttachmentSaverConstructorParams {
 }
 
 const PASTED_IMAGE_NAME_REG_EXP = /Pasted image (?<Timestamp>\d{14})/;
+const WINDOWS_PASTED_IMAGE_REG_EXP = /^image(?: \d+)?$/;
 const PASTED_IMAGE_DATE_FORMAT = 'YYYYMMDDHHmmss';
 const THRESHOLD_IN_SECONDS = 10;
 const moment = extractDefaultExportInterop(moment_);
@@ -93,7 +94,7 @@ export class AttachmentSaver {
     }
 
     let isPastedImage = false;
-    const match = PASTED_IMAGE_NAME_REG_EXP.exec(attachmentFileBaseName);
+    let match = PASTED_IMAGE_NAME_REG_EXP.exec(attachmentFileBaseName);
     if (match) {
       const timestampString = ensureNonNullable(match.groups?.['Timestamp']);
       const parsedDate = moment(timestampString, PASTED_IMAGE_DATE_FORMAT);
@@ -102,6 +103,9 @@ export class AttachmentSaver {
           isPastedImage = true;
         }
       }
+    } else if (WINDOWS_PASTED_IMAGE_REG_EXP.test(attachmentFileBaseName)) {
+      // Windows clipboard typically provides 'image.png' or 'image 1.png' etc.
+      isPastedImage = true;
     }
 
     const convertImageToJpegResult = await this.imageManager.convertToJpeg({

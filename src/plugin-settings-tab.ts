@@ -33,6 +33,7 @@ import {
 } from './plugin-settings.ts';
 import { TOKENIZED_STRING_LANGUAGE } from './prism-component.ts';
 import { Substitutions } from './substitutions.ts';
+import { extractBase64ImagesEntireVault } from './Base64Extractor.ts';
 
 const VISIBLE_SPACE_CHARACTER = '␣';
 const JPEG_QUALITY_PRECISION = 2;
@@ -463,6 +464,19 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
 
     new SettingGroupEx(this.containerEl)
       .setHeading(t(($) => $.pluginSettingsTab.groups.images))
+      .addSettingEx((setting) => {
+        setting
+          .setName(t(($) => $.pluginSettingsTab.extractBase64Images.name))
+          .setDesc(t(($) => $.pluginSettingsTab.extractBase64Images.description.part1))
+          .addButton((button) => {
+            button
+              .setButtonText(t(($) => $.pluginSettingsTab.extractBase64Images.buttonText))
+              .setCta()
+              .onClick(() => {
+                extractBase64ImagesEntireVault(this.plugin);
+              });
+          });
+      })
       .addSettingEx((setting) => {
         setting
           .setName(t(($) => $.pluginSettingsTab.defaultImageSize.name))
