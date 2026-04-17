@@ -31,7 +31,7 @@ export async function extractBase64Images(
 
     let content = await app.vault.read(note);
     // Support variations like charset and newlines in base64 data
-    const base64Regex = /!\[(.*?)\]\((data:image\/([a-zA-Z+]+)(?:;.*?)*?;base64,([a-zA-Z0-9+/=\s]+))(?:\s+"([^"]+)")?\)/g;
+    const base64Regex = /!\[(.*?)\]\((data:(?:image\/([a-zA-Z+]+)|application\/octet-stream)(?:;.*?)*?;base64,([a-zA-Z0-9+/=\s]+))(?:\s+"([^"]+)")?\)/g;
 
     let modified = false;
     const matches = [...content.matchAll(base64Regex)];
