@@ -34,6 +34,11 @@ import { PrismComponent } from './prism-component.ts';
 import { TokenValidator } from './token-validator.ts';
 
 export class Plugin extends PluginBase {
+  public pluginSettingsComponent!: PluginSettingsComponent;
+
+  public get abortSignal(): AbortSignal {
+    return this.abortSignalComponent.abortSignal;
+  }
   protected override createTranslationsMap(): TranslationsMap {
     return translationsMap;
   }
@@ -49,6 +54,7 @@ export class Plugin extends PluginBase {
         validatorWrapper
       })
     );
+    this.pluginSettingsComponent = pluginSettingsComponent;
 
     const validator = new TokenValidator({
       app: this.app,
