@@ -20,6 +20,7 @@ import { confirm } from 'obsidian-dev-utils/obsidian/modals/confirm';
 import { PluginSettingsTabBase } from 'obsidian-dev-utils/obsidian/plugin/plugin-settings-tab';
 import { SettingGroupEx } from 'obsidian-dev-utils/obsidian/setting-group-ex';
 
+import type { Plugin } from './plugin.ts';
 import type { PluginSettingsComponent } from './plugin-settings-component.ts';
 import type { PluginSettings } from './plugin-settings.ts';
 
@@ -547,7 +548,7 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
               .setButtonText(t(($) => $.pluginSettingsTab.extractBase64Images.buttonText))
               .setCta()
               .onClick(() => {
-                extractBase64ImagesEntireVault(this.plugin);
+                extractBase64ImagesEntireVault(this.plugin as unknown as Plugin);
               });
           });
       })

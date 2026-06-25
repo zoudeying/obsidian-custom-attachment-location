@@ -1,7 +1,7 @@
 import type { TAbstractFile } from 'obsidian';
 import type { Promisable } from 'type-fest';
 
-import { noopAsync } from 'obsidian-dev-utils/async';
+import { noopAsync } from 'obsidian-dev-utils/function';
 import { AbstractFileCommandHandler } from 'obsidian-dev-utils/obsidian/command-handlers/abstract-file-command-handler';
 import {
   isFile,

@@ -116,7 +116,7 @@ async function extractBase64ImagesInAbstractFilesImpl(plugin: Plugin, abstractFi
     abortSignal.throwIfAborted();
     const singleFile: null | TFile = abstractFiles.length === 1 && isFile(abstractFiles[0]) ? abstractFiles[0] : null;
 
-    if (singleFile && plugin.settings.isPathIgnored(singleFile.path)) {
+    if (singleFile && plugin.pluginSettingsComponent.settings.isPathIgnored(singleFile.path)) {
         new Notice(t(($) => $.notice.notePathIsIgnored));
         console.warn(`Cannot extract base64 images in the note as note path is ignored: ${singleFile.path}.`);
         return;
@@ -152,13 +152,13 @@ async function extractBase64ImagesInAbstractFilesImpl(plugin: Plugin, abstractFi
     const noteFilesSet = new Set<TFile>();
 
     for (const abstractFile of abstractFiles) {
-        if (isFile(abstractFile) && isNote(plugin.app, abstractFile)) {
+        if (isFile(abstractFile) && isNote(abstractFile)) {
             noteFilesSet.add(abstractFile);
         }
 
         if (isFolder(abstractFile)) {
             Vault.recurseChildren(abstractFile, (child) => {
-                if (isFile(child) && isNote(plugin.app, child)) {
+                if (isFile(child) && isNote(child)) {
                     noteFilesSet.add(child);
                 }
             });
@@ -179,7 +179,7 @@ async function extractBase64ImagesInAbstractFilesImpl(plugin: Plugin, abstractFi
         items: noteFiles,
         processItem: async (noteFile) => {
             combinedAbortSignal.throwIfAborted();
-            if (plugin.settings.isPathIgnored(noteFile.path)) {
+            if (plugin.pluginSettingsComponent.settings.isPathIgnored(noteFile.path)) {
                 return;
             }
             const count = await extractBase64Images(plugin, noteFile, combinedAbortSignal);
@@ -214,10 +214,9 @@ export async function extractBase64ImagesEntireVault(plugin: Plugin): Promise<vo
 
     addToQueue({
         abortSignal: plugin.abortSignal,
-        app: plugin.app,
         operationFn: (abortSignal) => extractBase64ImagesInAbstractFilesImpl(plugin, [plugin.app.vault.getRoot()], abortSignal, true),
         operationName: t(($) => $.commands.extractBase64ImagesEntireVault),
-        timeoutInMilliseconds: plugin.settings.getTimeoutInMilliseconds()
+        timeoutInMilliseconds: plugin.pluginSettingsComponent.settings.getTimeoutInMilliseconds()
     });
 }
 
@@ -251,9 +250,8 @@ export async function extractBase64ImagesInAbstractFiles(plugin: Plugin, abstrac
 
     addToQueue({
         abortSignal: plugin.abortSignal,
-        app: plugin.app,
         operationFn: (abortSignal) => extractBase64ImagesInAbstractFilesImpl(plugin, abstractFiles, abortSignal, true),
         operationName: t(($) => $.menuItems.extractBase64ImagesInFile),
-        timeoutInMilliseconds: plugin.settings.getTimeoutInMilliseconds()
+        timeoutInMilliseconds: plugin.pluginSettingsComponent.settings.getTimeoutInMilliseconds()
     });
 }
