@@ -20,10 +20,11 @@ import { confirm } from 'obsidian-dev-utils/obsidian/modals/confirm';
 import { PluginSettingsTabBase } from 'obsidian-dev-utils/obsidian/plugin/plugin-settings-tab';
 import { SettingGroupEx } from 'obsidian-dev-utils/obsidian/setting-group-ex';
 
-import type { Plugin } from './plugin.ts';
 import type { PluginSettingsComponent } from './plugin-settings-component.ts';
 import type { PluginSettings } from './plugin-settings.ts';
+import type { Plugin } from './plugin.ts';
 
+import { extractBase64ImagesEntireVault } from './Base64Extractor.ts';
 import {
   AttachmentRenameMode,
   CollectAttachmentUsedByMultipleNotesMode,
@@ -34,7 +35,6 @@ import {
 } from './plugin-settings.ts';
 import { TOKENIZED_STRING_LANGUAGE } from './prism-component.ts';
 import { Substitutions } from './substitutions.ts';
-import { extractBase64ImagesEntireVault } from './Base64Extractor.ts';
 
 const VISIBLE_SPACE_CHARACTER = '␣';
 const JPEG_QUALITY_PRECISION = 2;
