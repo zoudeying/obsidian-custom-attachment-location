@@ -285,13 +285,6 @@ export const defaultTranslations = {
       },
       name: 'Exclude paths'
     },
-    extractBase64Images: {
-      buttonText: 'Extract base64 images',
-      description: {
-        part1: 'Extract all base64-encoded images in the entire vault into physical attachments.'
-      },
-      name: 'Extract base64 images from vault'
-    },
     excludePathsFromAttachmentCollecting: {
       description: {
         part1: 'Exclude attachments from the following paths when',
@@ -302,6 +295,13 @@ export const defaultTranslations = {
         part6: 'If the setting is empty, no paths are excluded from attachment collecting.'
       },
       name: 'Exclude paths from attachment collecting'
+    },
+    extractBase64Images: {
+      buttonText: 'Extract base64 images',
+      description: {
+        part1: 'Extract all base64-encoded images in the entire vault into physical attachments.'
+      },
+      name: 'Extract base64 images from vault'
     },
     generatedAttachmentFileName: {
       description: {

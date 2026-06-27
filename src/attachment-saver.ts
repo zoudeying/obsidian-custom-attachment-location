@@ -94,7 +94,7 @@ export class AttachmentSaver {
     }
 
     let isPastedImage = false;
-    let match = PASTED_IMAGE_NAME_REG_EXP.exec(attachmentFileBaseName);
+    const match = PASTED_IMAGE_NAME_REG_EXP.exec(attachmentFileBaseName);
     if (match) {
       const timestampString = ensureNonNullable(match.groups?.['Timestamp']);
       const parsedDate = moment(timestampString, PASTED_IMAGE_DATE_FORMAT);

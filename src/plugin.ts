@@ -40,6 +40,7 @@ export class Plugin extends PluginBase {
   public get abortSignal(): AbortSignal {
     return this.abortSignalComponent.abortSignal;
   }
+
   protected override createTranslationsMap(): TranslationsMap {
     return translationsMap;
   }
