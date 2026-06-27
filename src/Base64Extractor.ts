@@ -12,7 +12,8 @@ import { addToQueue } from 'obsidian-dev-utils/obsidian/queue';
 import type { Plugin } from './plugin.ts';
 
 function base64ToArrayBuffer(base64: string): ArrayBuffer {
-    const binaryString = window.atob(base64);
+    const standardizedBase64 = base64.replace(/-/g, '+').replace(/_/g, '/');
+    const binaryString = window.atob(standardizedBase64);
     const len = binaryString.length;
     const bytes = new Uint8Array(len);
     for (let i = 0; i < len; i++) {
@@ -30,8 +31,8 @@ export async function extractBase64Images(
     const app = plugin.app;
 
     let content = await app.vault.read(note);
-    // Support variations like charset and newlines in base64 data
-    const base64Regex = /!\[(.*?)\]\((data:(?:image\/([a-zA-Z+]+)|application\/octet-stream)(?:;.*?)*?;base64,([a-zA-Z0-9+/=\s]+))(?:\s+"([^"]+)")?\)/g;
+    // Support variations like charset, newlines, URL-safe base64, and complex mime types
+    const base64Regex = /!\[(.*?)\]\(\s*(data:(?:image\/([a-zA-Z0-9.\-+]+)|application\/octet-stream)(?:;[^,]+)*?;base64,([a-zA-Z0-9+/=\-_\s]+))(?:\s+"([^"]+)")?\s*\)/g;
 
     let modified = false;
     const matches = [...content.matchAll(base64Regex)];
