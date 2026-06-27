@@ -50,7 +50,7 @@ export async function extractBase64Images(
     const base64Data = (match[4] ?? '').replace(/\s/g, '');
     const titleAttr = match[5] ?? '';
 
-    if (extension.toLowerCase() === 'jpeg') { extension = 'jpg'; }
+    if (extension.toLowerCase() === 'jpeg') extension = 'jpg';
 
     let baseName = titleAttr || altText || `Pasted image ${window.moment().format('YYYYMMDDHHmmss')}`;
 
@@ -126,7 +126,7 @@ export async function extractBase64ImagesEntireVault(plugin: Plugin): Promise<vo
     title: t(($) => $.commands.extractBase64ImagesEntireVault)
   });
 
-  if (!canExtractBase64Images) { return; }
+  if (!canExtractBase64Images) return;
 
   addToQueue({
     abortSignal: plugin.abortSignal,
@@ -162,7 +162,7 @@ export async function extractBase64ImagesInAbstractFiles(plugin: Plugin, abstrac
     });
   }
 
-  if (!canExtract) { return; }
+  if (!canExtract) return;
 
   addToQueue({
     abortSignal: plugin.abortSignal,
