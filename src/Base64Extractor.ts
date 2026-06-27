@@ -21,17 +21,6 @@ import { addToQueue } from 'obsidian-dev-utils/obsidian/queue';
 
 import type { Plugin } from './plugin.ts';
 
-function base64ToArrayBuffer(base64: string): ArrayBuffer {
-  const standardizedBase64 = base64.replace(/-/g, '+').replace(/_/g, '/');
-  const binaryString = window.atob(standardizedBase64);
-  const len = binaryString.length;
-  const bytes = new Uint8Array(len);
-  for (let i = 0; i < len; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
-  return bytes.buffer;
-}
-
 export async function extractBase64Images(
   plugin: Plugin,
   note: TFile,
@@ -41,8 +30,9 @@ export async function extractBase64Images(
   const app = plugin.app;
 
   let content = await app.vault.read(note);
-  // Support variations like charset, newlines, URL-safe base64, and complex mime types
-  const base64Regex = /!\[(.*?)\]\(\s*(data:(?:image\/([a-zA-Z0-9.\-+]+)|application\/octet-stream)(?:;[^,]+)*?;base64,([a-zA-Z0-9+/=\-_\s]+))(?:\s+"([^"]+)")?\s*\)/g;
+  // Support variations like charset, newlines, URL-safe base64, complex mime types, and malformed base64 strings
+  // eslint-disable-next-line prefer-named-capture-group -- we do not need named capture groups here
+  const base64Regex = /!\[([\s\S]*?)\]\(\s*<?(data:(?:image\/([a-zA-Z0-9.\-+]+)|application\/octet-stream)[^,]*?;base64,([^)'"]+))>?(?:\s+['"]([^'"]*)['"])?\s*\)/g;
 
   let modified = false;
   const matches = [...content.matchAll(base64Regex)];
@@ -54,18 +44,18 @@ export async function extractBase64Images(
   for (const match of matches) {
     abortSignal.throwIfAborted();
     const fullMatch = match[0];
-    const altText = match[1] || '';
-    let extension = match[3] || 'png';
+    const altText = match[1] ?? '';
+    let extension = match[3] ?? 'png';
     // Remove spaces and newlines from base64 data
-    const base64Data = (match[4] || '').replace(/\s/g, '');
-    const titleAttr = match[5] || '';
+    const base64Data = (match[4] ?? '').replace(/\s/g, '');
+    const titleAttr = match[5] ?? '';
 
-    if (extension.toLowerCase() === 'jpeg') extension = 'jpg';
+    if (extension.toLowerCase() === 'jpeg') { extension = 'jpg'; }
 
     let baseName = titleAttr || altText || `Pasted image ${window.moment().format('YYYYMMDDHHmmss')}`;
 
     // Ensure baseName is parsed through plugin's logic if possible, or at least keep "Pasted image" format
-    // if alt text is 'image' or not provided to allow AttachmentRenameMode to trigger.
+    // If alt text is 'image' or not provided to allow AttachmentRenameMode to trigger.
     if (baseName === 'image') {
       baseName = `Pasted image ${window.moment().format('YYYYMMDDHHmmss')}`;
     }
@@ -85,11 +75,11 @@ export async function extractBase64Images(
       let markdownLink = app.fileManager.generateMarkdownLink(attachmentFile, note.path);
 
       if (!markdownLink.startsWith('!')) {
-        markdownLink = '!' + markdownLink;
+        markdownLink = `!${markdownLink}`;
       }
 
       // Inherit the alt text if there is one that's meaningful, and substitute the markdown link
-      // if generateMarkdownLink gave generic markdown link but we want alt
+      // If generateMarkdownLink gave generic markdown link but we want alt
       if (altText && altText !== baseName && markdownLink.startsWith('![')) {
         // Determine if it's a wikilink ![[...]] or standard link ![](...)
         if (markdownLink.startsWith('![[')) {
@@ -106,8 +96,8 @@ export async function extractBase64Images(
       // IDENTICAL base64 matches, replacing the first one again will break.
       // Also, functional replacer avoids `$` being interpreted in markdownLink.
       // But we must only replace the specific match at its specific index. Since we are in a loop,
-      // we will replace the full text, but we must only replace one occurrence at a time.
-      let matchIndex = content.indexOf(fullMatch);
+      // We will replace the full text, but we must only replace one occurrence at a time.
+      const matchIndex = content.indexOf(fullMatch);
       if (matchIndex !== -1) {
         content = content.substring(0, matchIndex) + markdownLink + content.substring(matchIndex + fullMatch.length);
         modified = true;
@@ -121,6 +111,76 @@ export async function extractBase64Images(
     await app.vault.modify(note, content);
   }
   return matches.length;
+}
+
+export async function extractBase64ImagesEntireVault(plugin: Plugin): Promise<void> {
+  const canExtractBase64Images = await confirm({
+    app: plugin.app,
+    cancelButtonText: t(($) => $.obsidianDevUtils.buttons.cancel),
+    message: createFragment((f) => {
+      f.appendText(t(($) => $.base64Extractor.confirm.part1));
+      f.createEl('br');
+      f.appendText(t(($) => $.base64Extractor.confirm.part2));
+    }),
+    okButtonText: t(($) => $.obsidianDevUtils.buttons.ok),
+    title: t(($) => $.commands.extractBase64ImagesEntireVault)
+  });
+
+  if (!canExtractBase64Images) { return; }
+
+  addToQueue({
+    abortSignal: plugin.abortSignal,
+    operationFn: (abortSignal) => extractBase64ImagesInAbstractFilesImpl(plugin, [plugin.app.vault.getRoot()], abortSignal, true),
+    operationName: t(($) => $.commands.extractBase64ImagesEntireVault),
+    timeoutInMilliseconds: plugin.pluginSettingsComponent.settings.getTimeoutInMilliseconds()
+  });
+}
+
+export async function extractBase64ImagesInAbstractFiles(plugin: Plugin, abstractFiles: TAbstractFile[]): Promise<void> {
+  const singleFile: null | TFile = abstractFiles.length === 1 && isFile(abstractFiles[0]) ? abstractFiles[0] : null;
+
+  let canExtract = !!singleFile;
+  if (!canExtract) {
+    canExtract = await confirm({
+      app: plugin.app,
+      cancelButtonText: t(($) => $.obsidianDevUtils.buttons.cancel),
+      message: createFragment((f) => {
+        f.appendText(t(($) => $.base64Extractor.confirm.part1));
+        f.createEl('br');
+        f.createEl('ul', {}, (ul) => {
+          for (const abstractFile of abstractFiles) {
+            ul.createEl('li', {}, (li) => {
+              appendCodeBlock(li, abstractFile.path);
+            });
+          }
+        });
+        f.createEl('br');
+        f.appendText(t(($) => $.base64Extractor.confirm.part2));
+      }),
+      okButtonText: t(($) => $.obsidianDevUtils.buttons.ok),
+      title: t(($) => $.commands.extractBase64ImagesEntireVault)
+    });
+  }
+
+  if (!canExtract) { return; }
+
+  addToQueue({
+    abortSignal: plugin.abortSignal,
+    operationFn: (abortSignal) => extractBase64ImagesInAbstractFilesImpl(plugin, abstractFiles, abortSignal, true),
+    operationName: t(($) => $.menuItems.extractBase64ImagesInFile),
+    timeoutInMilliseconds: plugin.pluginSettingsComponent.settings.getTimeoutInMilliseconds()
+  });
+}
+
+function base64ToArrayBuffer(base64: string): ArrayBuffer {
+  const standardizedBase64 = base64.replace(/-/g, '+').replace(/_/g, '/');
+  const binaryString = window.atob(standardizedBase64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes.buffer;
 }
 
 async function extractBase64ImagesInAbstractFilesImpl(plugin: Plugin, abstractFiles: TAbstractFile[], abortSignal: AbortSignal, alreadyConfirmed: boolean): Promise<void> {
@@ -206,63 +266,4 @@ async function extractBase64ImagesInAbstractFilesImpl(plugin: Plugin, abstractFi
   } else if (totalExtracted > 0) {
     new Notice(`Successfully extracted ${totalExtracted} base64 images.`);
   }
-}
-
-export async function extractBase64ImagesEntireVault(plugin: Plugin): Promise<void> {
-  const canExtractBase64Images = await confirm({
-    app: plugin.app,
-    cancelButtonText: t(($) => $.obsidianDevUtils.buttons.cancel),
-    message: createFragment((f) => {
-      f.appendText(t(($) => $.base64Extractor.confirm.part1));
-      f.createEl('br');
-      f.appendText(t(($) => $.base64Extractor.confirm.part2));
-    }),
-    okButtonText: t(($) => $.obsidianDevUtils.buttons.ok),
-    title: t(($) => $.commands.extractBase64ImagesEntireVault)
-  });
-
-  if (!canExtractBase64Images) return;
-
-  addToQueue({
-    abortSignal: plugin.abortSignal,
-    operationFn: (abortSignal) => extractBase64ImagesInAbstractFilesImpl(plugin, [plugin.app.vault.getRoot()], abortSignal, true),
-    operationName: t(($) => $.commands.extractBase64ImagesEntireVault),
-    timeoutInMilliseconds: plugin.pluginSettingsComponent.settings.getTimeoutInMilliseconds()
-  });
-}
-
-export async function extractBase64ImagesInAbstractFiles(plugin: Plugin, abstractFiles: TAbstractFile[]): Promise<void> {
-  const singleFile: null | TFile = abstractFiles.length === 1 && isFile(abstractFiles[0]) ? abstractFiles[0] : null;
-
-  let canExtract = !!singleFile;
-  if (!canExtract) {
-    canExtract = await confirm({
-      app: plugin.app,
-      cancelButtonText: t(($) => $.obsidianDevUtils.buttons.cancel),
-      message: createFragment((f) => {
-        f.appendText(t(($) => $.base64Extractor.confirm.part1));
-        f.createEl('br');
-        f.createEl('ul', {}, (ul) => {
-          for (const abstractFile of abstractFiles) {
-            ul.createEl('li', {}, (li) => {
-              appendCodeBlock(li, abstractFile.path);
-            });
-          }
-        });
-        f.createEl('br');
-        f.appendText(t(($) => $.base64Extractor.confirm.part2));
-      }),
-      okButtonText: t(($) => $.obsidianDevUtils.buttons.ok),
-      title: t(($) => $.commands.extractBase64ImagesEntireVault)
-    });
-  }
-
-  if (!canExtract) return;
-
-  addToQueue({
-    abortSignal: plugin.abortSignal,
-    operationFn: (abortSignal) => extractBase64ImagesInAbstractFilesImpl(plugin, abstractFiles, abortSignal, true),
-    operationName: t(($) => $.menuItems.extractBase64ImagesInFile),
-    timeoutInMilliseconds: plugin.pluginSettingsComponent.settings.getTimeoutInMilliseconds()
-  });
 }
