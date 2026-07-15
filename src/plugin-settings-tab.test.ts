@@ -46,6 +46,16 @@ import {
 } from './plugin-settings.ts';
 import { TokenValidator } from './token-validator.ts';
 
+vi.mock('@obsidian-typings/obsidian-public-latest/implementations', () => ({
+  loadPrism: vi.fn(() =>
+    Promise.resolve({
+      highlightAll: vi.fn(),
+      highlightElement: vi.fn(),
+      languages: {}
+    })
+  )
+}));
+
 vi.mock('obsidian-dev-utils/obsidian/modals/confirm', () => ({
   confirm: vi.fn((): Promise<boolean> => Promise.resolve(true))
 }));
@@ -103,6 +113,7 @@ const originalSetName = SettingEx.prototype.setName;
 async function createTab(configure?: (settings: PluginSettings) => void): Promise<CreatedTab> {
   const app = App.createConfigured__();
   const originalApp = app.asOriginalType__();
+  Object.assign(originalApp, { $$typeof: undefined });
   const validatorWrapper = ValueWrapper.unset<TokenValidator>();
   const pluginSettingsComponent = new PluginSettingsComponent({
     app: originalApp,
@@ -118,7 +129,12 @@ async function createTab(configure?: (settings: PluginSettings) => void): Promis
   });
   await pluginSettingsComponent.loadWithPromises();
 
-  const obsidianPlugin = strictProxy<Plugin>({ app: originalApp });
+  const obsidianPlugin = strictProxy<Plugin>({
+    $$typeof: undefined,
+    abortSignal: new AbortController().signal,
+    app: originalApp,
+    pluginSettingsComponent
+  });
 
   const buttons: ButtonComponentClass[] = [];
   const toggles: CapturedToggle[] = [];
@@ -552,7 +568,7 @@ function findMultipleTextComponent(components: CapturedMultipleTextComponent[], 
 }
 
 function getResetButton(buttons: ButtonComponentClass[]): ButtonComponentClass {
-  const button = buttons[0];
+  const button = buttons[buttons.length - 1];
   if (!button) {
     throw new Error('Reset button was not captured.');
   }

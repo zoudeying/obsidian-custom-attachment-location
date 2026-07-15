@@ -10,7 +10,13 @@ import {
 } from 'vitest';
 
 vi.mock('@obsidian-typings/obsidian-public-latest/implementations', () => ({
-  loadPrism: vi.fn()
+  loadPrism: vi.fn(() =>
+    Promise.resolve({
+      highlightAll: vi.fn(),
+      highlightElement: vi.fn(),
+      languages: {}
+    })
+  )
 }));
 
 // eslint-disable-next-line import-x/first, import-x/imports-first -- vi.mock must precede imports.
@@ -20,6 +26,8 @@ import {
 } from './prism-component.ts';
 
 interface PrismLike {
+  highlightAll(): void;
+  highlightElement(element: Element): void;
   languages: Record<string, unknown>;
 }
 
@@ -27,6 +35,8 @@ const mockLoadPrism = vi.mocked(loadPrism);
 
 function createPrism(withJavascript: boolean): PrismLike {
   return {
+    highlightAll: vi.fn(),
+    highlightElement: vi.fn(),
     languages: withJavascript ? { javascript: { keyword: /\bif\b/ } } : {}
   };
 }

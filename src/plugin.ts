@@ -45,6 +45,10 @@ export class Plugin extends PluginBase {
     return super.pluginNoticeComponent;
   }
 
+  public override set pluginNoticeComponent(value: PluginNoticeComponent) {
+    super.pluginNoticeComponent = value;
+  }
+
   public get pluginSettingsComponent(): PluginSettingsComponent {
     return ensureNonNullable(this._pluginSettingsComponent);
   }
