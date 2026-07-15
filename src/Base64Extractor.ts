@@ -27,42 +27,6 @@ interface ProcessedMatchResult {
   readonly markdownLink: null | string;
 }
 
-export async function extractBase64Images(
-  plugin: Plugin,
-  note: TFile,
-  abortSignal: AbortSignal
-): Promise<number> {
-  abortSignal.throwIfAborted();
-  const app = plugin.app;
-
-  let content = await app.vault.read(note);
-  // Support variations like charset, newlines, URL-safe base64, complex mime types, and malformed base64 strings
-  const base64Regex = /!\[(?<altText>[\s\S]*?)\]\(\s*<?(?<fullData>data:(?:image\/(?<extension>[a-zA-Z0-9.\-+]+)|application\/octet-stream)[^,]*?;base64,(?<base64Data>[^)'"]+))>?(?:\s+['"](?<titleAttr>[^'"]*)['"])?\s*\)/g;
-
-  let modified = false;
-  const matches = [...content.matchAll(base64Regex)];
-
-  if (matches.length === 0) {
-    return 0;
-  }
-
-  for (const match of matches) {
-    const { fullMatch, markdownLink } = await processBase64Match(app, note, match, abortSignal);
-    if (markdownLink !== null) {
-      const matchIndex = content.indexOf(fullMatch);
-      if (matchIndex !== -1) {
-        content = content.substring(0, matchIndex) + markdownLink + content.substring(matchIndex + fullMatch.length);
-        modified = true;
-      }
-    }
-  }
-
-  if (modified) {
-    await app.vault.modify(note, content);
-  }
-  return matches.length;
-}
-
 export async function extractBase64ImagesEntireVault(plugin: Plugin): Promise<void> {
   const canExtractBase64Images = await confirm({
     app: plugin.app,
@@ -135,6 +99,42 @@ function base64ToArrayBuffer(base64: string): ArrayBuffer {
     bytes[i] = binaryString.charCodeAt(i);
   }
   return bytes.buffer;
+}
+
+async function extractBase64Images(
+  plugin: Plugin,
+  note: TFile,
+  abortSignal: AbortSignal
+): Promise<number> {
+  abortSignal.throwIfAborted();
+  const app = plugin.app;
+
+  let content = await app.vault.read(note);
+  // Support variations like charset, newlines, URL-safe base64, complex mime types, and malformed base64 strings
+  const base64Regex = /!\[(?<altText>[\s\S]*?)\]\(\s*<?(?<fullData>data:(?:image\/(?<extension>[a-zA-Z0-9.\-+]+)|application\/octet-stream)[^,]*?;base64,(?<base64Data>[^)'"]+))>?(?:\s+['"](?<titleAttr>[^'"]*)['"])?\s*\)/g;
+
+  let modified = false;
+  const matches = [...content.matchAll(base64Regex)];
+
+  if (matches.length === 0) {
+    return 0;
+  }
+
+  for (const match of matches) {
+    const { fullMatch, markdownLink } = await processBase64Match(app, note, match, abortSignal);
+    if (markdownLink !== null) {
+      const matchIndex = content.indexOf(fullMatch);
+      if (matchIndex !== -1) {
+        content = content.substring(0, matchIndex) + markdownLink + content.substring(matchIndex + fullMatch.length);
+        modified = true;
+      }
+    }
+  }
+
+  if (modified) {
+    await app.vault.modify(note, content);
+  }
+  return matches.length;
 }
 
 async function extractBase64ImagesInAbstractFilesImpl(plugin: Plugin, abstractFiles: TAbstractFile[], abortSignal: AbortSignal, alreadyConfirmed: boolean): Promise<void> {
