@@ -1,0 +1,5 @@
+{
+  "skip": [
+    "https://github.com/mnaoumov/obsidian-dev-utils/blob/main/docs/debugging.md"
+  ]
+}
