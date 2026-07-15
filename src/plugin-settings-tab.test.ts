@@ -130,11 +130,11 @@ async function createTab(configure?: (settings: PluginSettings) => void): Promis
   await pluginSettingsComponent.loadWithPromises();
 
   const obsidianPlugin = strictProxy<Plugin>({
-    $$typeof: undefined,
     abortSignal: new AbortController().signal,
     app: originalApp,
     pluginSettingsComponent
   });
+  Object.assign(obsidianPlugin, { $$typeof: undefined });
 
   const buttons: ButtonComponentClass[] = [];
   const toggles: CapturedToggle[] = [];
