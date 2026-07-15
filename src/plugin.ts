@@ -1,3 +1,4 @@
+import type { PluginNoticeComponent } from 'obsidian-dev-utils/obsidian/components/plugin-notice-component';
 import type { RenameDeleteHandlerSettings } from 'obsidian-dev-utils/obsidian/components/rename-delete-handler-component';
 import type { TranslationsMap } from 'obsidian-dev-utils/obsidian/i18n/i18n';
 
@@ -10,6 +11,7 @@ import { RenameDeleteHandlerComponent } from 'obsidian-dev-utils/obsidian/compon
 import { PluginDataHandler } from 'obsidian-dev-utils/obsidian/data-handler';
 import { PluginBase } from 'obsidian-dev-utils/obsidian/plugin/plugin';
 import { PluginEventSourceImpl } from 'obsidian-dev-utils/obsidian/plugin/plugin-event-source';
+import { ensureNonNullable } from 'obsidian-dev-utils/type-guards';
 import { ValueWrapper } from 'obsidian-dev-utils/value-wrapper';
 
 import { ArrayBufferMap } from './array-buffer-map.ts';
@@ -35,11 +37,19 @@ import { PrismComponent } from './prism-component.ts';
 import { TokenValidator } from './token-validator.ts';
 
 export class Plugin extends PluginBase {
-  public pluginSettingsComponent!: PluginSettingsComponent;
-
   public get abortSignal(): AbortSignal {
     return this.abortSignalComponent.abortSignal;
   }
+
+  public override get pluginNoticeComponent(): PluginNoticeComponent {
+    return super.pluginNoticeComponent;
+  }
+
+  public get pluginSettingsComponent(): PluginSettingsComponent {
+    return ensureNonNullable(this._pluginSettingsComponent);
+  }
+
+  private _pluginSettingsComponent?: PluginSettingsComponent;
 
   protected override createTranslationsMap(): TranslationsMap {
     return translationsMap;
@@ -56,7 +66,7 @@ export class Plugin extends PluginBase {
         validatorWrapper
       })
     );
-    this.pluginSettingsComponent = pluginSettingsComponent;
+    this._pluginSettingsComponent = pluginSettingsComponent;
 
     const validator = new TokenValidator({
       app: this.app,

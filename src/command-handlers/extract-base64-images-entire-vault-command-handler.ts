@@ -1,4 +1,3 @@
-import { noopAsync } from 'obsidian-dev-utils/function';
 import { GlobalCommandHandler } from 'obsidian-dev-utils/obsidian/command-handlers/global-command-handler';
 import { t } from 'obsidian-dev-utils/obsidian/i18n/i18n';
 
@@ -24,7 +23,6 @@ export class ExtractBase64ImagesEntireVaultCommandHandler extends GlobalCommandH
   }
 
   protected override async execute(): Promise<void> {
-    extractBase64ImagesEntireVault(this.plugin);
-    return noopAsync();
+    await extractBase64ImagesEntireVault(this.plugin);
   }
 }

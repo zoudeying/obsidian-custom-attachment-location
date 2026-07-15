@@ -1,7 +1,6 @@
 import type { TAbstractFile } from 'obsidian';
 import type { Promisable } from 'type-fest';
 
-import { noopAsync } from 'obsidian-dev-utils/function';
 import { AbstractFileCommandHandler } from 'obsidian-dev-utils/obsidian/command-handlers/abstract-file-command-handler';
 import {
   isFile,
@@ -51,8 +50,7 @@ export class ExtractBase64ImagesInFileCommandHandler extends AbstractFileCommand
   }
 
   protected override async executeAbstractFiles(abstractFiles: TAbstractFile[]): Promise<void> {
-    extractBase64ImagesInAbstractFiles(this.plugin, abstractFiles);
-    return noopAsync();
+    await extractBase64ImagesInAbstractFiles(this.plugin, abstractFiles);
   }
 
   protected override shouldAddToAbstractFileMenu(): boolean {

@@ -40,14 +40,17 @@ const VISIBLE_SPACE_CHARACTER = '␣';
 const JPEG_QUALITY_PRECISION = 2;
 
 interface PluginSettingsTabConstructorParams extends PluginSettingsTabBaseConstructorParams<PluginSettings> {
+  readonly plugin: Plugin;
   readonly pluginSettingsComponent: PluginSettingsComponent;
 }
 
 export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
+  private readonly plugin2: Plugin;
   private readonly pluginSettingsComponent2: PluginSettingsComponent;
 
   public constructor(params: PluginSettingsTabConstructorParams) {
     super(params);
+    this.plugin2 = params.plugin;
     this.pluginSettingsComponent2 = params.pluginSettingsComponent;
   }
 
@@ -548,7 +551,9 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
               .setButtonText(t(($) => $.pluginSettingsTab.extractBase64Images.buttonText))
               .setCta()
               .onClick(() => {
-                extractBase64ImagesEntireVault(this.plugin as unknown as Plugin);
+                invokeAsyncSafely(async () => {
+                  await extractBase64ImagesEntireVault(this.plugin2);
+                });
               });
           });
       })
