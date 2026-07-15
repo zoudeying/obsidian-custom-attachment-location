@@ -1,5 +1,23 @@
 # CHANGELOG
 
+## 12.0.0
+
+- build: add linkinator to cspell dictionary
+- fix: resolve TS check for proxy properties in tests
+- test: fix reset button selector and Vitest mock leaks in settings tab tests
+- fix: make extractBase64Images internal and sort module declarations
+- build: add linkinator.config.json to ignore broken external link
+- fix: update Base64Extractor and plugin for upstream compatibility and strict linting
+- chore: format Base64Extractor.ts
+- chore: fix linting issues
+- fix(base64): make regex extremely robust to handle malformed strings and varying markdown formats
+- style: format files
+- fix: support URL-safe base64 and complex mime types in extraction regex
+- fix: resolve build errors after rebase
+- feat: support application/octet-stream base64 encoded images
+- chore: initial release action flow with node 22
+- feat: add feature of base64 extraction
+
 ## 11.1.1
 
 - chore: update libs
