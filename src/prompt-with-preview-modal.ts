@@ -12,8 +12,9 @@ import {
   invokeAsyncSafely
 } from 'obsidian-dev-utils/async';
 import { CssClass } from 'obsidian-dev-utils/obsidian/css-class';
+import { applySpellcheckMode } from 'obsidian-dev-utils/obsidian/html-element';
 import { t } from 'obsidian-dev-utils/obsidian/i18n/i18n';
-import { isSpellcheckEnabled } from 'obsidian-dev-utils/obsidian/obsidian-settings';
+import { SpellcheckMode } from 'obsidian-dev-utils/obsidian/obsidian-settings';
 import { addPluginCssClasses } from 'obsidian-dev-utils/obsidian/plugin/plugin-context';
 import { trashSafe } from 'obsidian-dev-utils/obsidian/vault';
 
@@ -178,11 +179,15 @@ class PromptWithPreviewModal extends Modal {
     textComponent.setPlaceholder(heading);
     inputEl.addClass(CssClass.TextBox);
     /*
-     * `AbstractTextComponent` forces `spellcheck="false"` on every text component, so the vault
-     * setting has to be re-applied here. Obsidian's own file explorer reads the same config when it
-     * starts an inline rename.
+     * `AbstractTextComponent` forces `spellcheck="false"` on every text component, so the mode has to
+     * be applied here. This box names a file, so it follows `Editor > Spellcheck` — the same thing
+     * ODU's own `prompt()` does, and what Obsidian's file explorer does for an inline rename.
      */
-    inputEl.setAttribute('spellcheck', String(isSpellcheckEnabled(this.app)));
+    applySpellcheckMode({
+      app: this.app,
+      element: inputEl,
+      spellcheckMode: SpellcheckMode.FollowObsidianSetting
+    });
     textComponent.onChange((newValue) => {
       this.value = newValue;
     });
