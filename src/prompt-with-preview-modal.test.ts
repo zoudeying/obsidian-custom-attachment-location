@@ -70,7 +70,7 @@ function createApp(overrides: StrictProxyPartial<App>): App {
     embedRegistry: createEmbedRegistry({}),
     vault: castTo<App['vault']>({
       createBinary: vi.fn((path: string): Promise<TFile> => Promise.resolve(strictProxy<TFile>({ path }))),
-      // Read by `isSpellcheckEnabled`, which re-applies the vault's spellcheck setting to the input.
+      // Read by `applySpellcheckMode`, which re-applies the vault's spellcheck setting to the input.
       getConfig: vi.fn((): boolean => true)
     }),
     ...overrides
