@@ -1,5 +1,21 @@
 # CHANGELOG
 
+## 12.0.1
+
+- test: cover the three unused-attachments-remover paths the gate was short on
+- chore: bring the lockfile up to the obsidian-dev-utils floor it now declares
+- refactor: replace the hand-rolled settings-migration copy with the shared component
+- docs: say where the debug command is run
+- refactor(modals): take the input-spellcheck rule from obsidian-dev-utils
+- docs: name the unversioned demo-vault asset and the folder it unzips into
+- chore: make the LICENSE copyright line lintable and guard it against the year roll-over
+- test(test-mocks): stop replacing the plugin registry, and sweep the dependencies
+- test(unit-folder-rescue): prove issue #70 fixed with both real plugins on one vault
+- feat(ownerless-attachments): reach attachment folders whose owning note is gone
+- chore(deps): move to obsidian-dev-utils 101 and obsidian-test-mocks 5
+- refactor(move-to-proper-folder): drop the `this` alias the directory review flags
+- feat(rename-by-plugin): scope the foreign-attachment rename to named plugins
+
 ## 12.0.0
 
 - feat(rename-delete)!: hand rename and delete over to Advanced Rename and Delete Handler
