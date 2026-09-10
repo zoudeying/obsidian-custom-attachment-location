@@ -12,6 +12,7 @@ import type {
   ToggleComponent
 } from 'obsidian';
 import type { AsyncEventRef } from 'obsidian-dev-utils/async-events';
+import type { PluginGateComponent } from 'obsidian-dev-utils/obsidian/components/plugin-gate-component';
 import type { PluginSuggestionComponent } from 'obsidian-dev-utils/obsidian/components/plugin-suggestion-component';
 import type { DataHandler } from 'obsidian-dev-utils/obsidian/data-handler';
 import type { PluginEventSource } from 'obsidian-dev-utils/obsidian/plugin/plugin-event-source';
@@ -80,14 +81,18 @@ vi.mock('@obsidian-typings/obsidian-public-latest/implementations', async (impor
 const DEBOUNCE_REVALIDATION_TEST_TIMEOUT_IN_MILLISECONDS = 30_000;
 
 // Every declared row across the inline Core group and the eight sub-pages, guarding against a whole section being dropped when rows are moved between pages.
-// 31 = 30 setting rows + the suggestion banner row that rides at the top.
-const EXPECTED_ROW_COUNT = 31;
+// 32 = 30 setting rows + the two banner rows that ride at the top, suggestion then overlap.
+const EXPECTED_ROW_COUNT = 32;
 
 const STRICT_PROXY_TARGET_SYMBOL = Symbol.for('strictProxyTarget');
 
 // The suggestion banner's two inputs, so a test can drive both the row's render and its visibility.
 const renderBannerMock = vi.fn<(containerEl: HTMLElement) => void>();
 let suggestedPluginState = SuggestedPluginState.Enabled;
+
+// The overlap banner's single input. Whether it writes anything is what decides the row's fate, since the
+// Row hides itself when the library renders nothing.
+const renderConflictWarningBannerMock = vi.fn<(containerEl: HTMLElement) => void>();
 
 interface CapturedMultipleValueComponent {
   name: string;
@@ -289,6 +294,10 @@ async function createTab(configure?: (settings: PluginSettings) => void): Promis
   });
 
   const tab = new PluginSettingsTab({
+    getPluginGateComponent: (): PluginGateComponent =>
+      strictProxy<PluginGateComponent>({
+        renderConflictWarningBanner: renderConflictWarningBannerMock
+      }),
     plugin: obsidianPlugin,
     pluginSettingsComponent,
     pluginSuggestionComponent: strictProxy<PluginSuggestionComponent>({
@@ -324,6 +333,21 @@ async function createTab(configure?: (settings: PluginSettings) => void): Promis
 }
 
 /**
+ * Finds the overlap banner row — the SECOND of the tab's two nameless banner rows.
+ *
+ * @param tab - The settings tab.
+ * @returns The row.
+ */
+function findConflictRow(tab: PluginSettingsTab): SettingDefinitionRender {
+  const row = findRows(tab, '')[1];
+  if (row) {
+    return row;
+  }
+
+  throw new Error('Overlap banner row not found');
+}
+
+/**
  * Finds a declared row by name.
  *
  * @param tab - The settings tab.
@@ -331,12 +355,29 @@ async function createTab(configure?: (settings: PluginSettings) => void): Promis
  * @returns The row.
  */
 function findRow(tab: PluginSettingsTab, name: string): SettingDefinitionRender {
-  const row = flattenRows(tab.getSettingDefinitions()).find((candidate) => 'name' in candidate && candidate.name === name);
+  const row = findRows(tab, name)[0];
   if (row) {
-    return castTo<SettingDefinitionRender>(row);
+    return row;
   }
 
   throw new Error(`Row not found: ${name}`);
+}
+
+/**
+ * Finds every declared row carrying one name, in declaration order.
+ *
+ * Needed because the two banner rows are both nameless: a name is what a row shows beside its control, and
+ * a banner is a bare host with no control, so neither can carry one. They are told apart by position, which
+ * is the order the tab declares them in — suggestion first, then the overlap banner.
+ *
+ * @param tab - The settings tab.
+ * @param name - The name to match.
+ * @returns The matching rows.
+ */
+function findRows(tab: PluginSettingsTab, name: string): SettingDefinitionRender[] {
+  return flattenRows(tab.getSettingDefinitions())
+    .filter((candidate) => 'name' in candidate && candidate.name === name)
+    .map((row) => castTo<SettingDefinitionRender>(row));
 }
 
 /**
@@ -456,6 +497,9 @@ beforeAll(async () => {
 describe('PluginSettingsTab', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // `clearAllMocks` drops the recorded calls but keeps any implementation set by an earlier test, and
+    // Whether this one writes into the container is exactly what the overlap row's tests differ on.
+    renderConflictWarningBannerMock.mockReset();
     suggestedPluginState = SuggestedPluginState.Enabled;
   });
 
@@ -496,6 +540,52 @@ describe('PluginSettingsTab', () => {
     });
   });
 
+  describe('Consistent Attachments and Links overlap banner', () => {
+    it('should hand the row element to the plugin gate, emptied first', async () => {
+      renderConflictWarningBannerMock.mockImplementation((containerEl) => {
+        containerEl.createDiv({ text: 'Overlap' });
+      });
+      const { tab } = await createTab();
+      const setting = new SettingEx(tab.containerEl);
+      setting.setName('Leftover');
+
+      findConflictRow(tab).render(setting, castTo<SettingGroup>(null));
+
+      expect(renderConflictWarningBannerMock).toHaveBeenCalledWith(setting.settingEl);
+      expect(setting.settingEl.textContent).toBe('Overlap');
+    });
+
+    // The library renders nothing when no overlap holds, and an empty row is still a row — a divider and a
+    // Block of padding with nothing in it.
+    it('should hide itself when the gate renders no banner', async () => {
+      const { tab } = await createTab();
+      const setting = new SettingEx(tab.containerEl);
+
+      findConflictRow(tab).render(setting, castTo<SettingGroup>(null));
+
+      // `isShown()` reads `offsetParent`, which jsdom never populates, so the display style is what a test
+      // Can actually see here.
+      expect(setting.settingEl.style.display).toBe('none');
+    });
+
+    it('should stay visible once the gate has rendered a banner', async () => {
+      renderConflictWarningBannerMock.mockImplementation((containerEl) => {
+        containerEl.createDiv({ text: 'Overlap' });
+      });
+      const { tab } = await createTab();
+      const setting = new SettingEx(tab.containerEl);
+
+      findConflictRow(tab).render(setting, castTo<SettingGroup>(null));
+
+      expect(setting.settingEl.style.display).toBe('');
+    });
+
+    it('should stay out of the settings search', async () => {
+      const { tab } = await createTab();
+      expect(findConflictRow(tab).searchable).toBe(false);
+    });
+  });
+
   it('should be constructable', async () => {
     const { tab } = await createTab();
     expect(tab).toBeInstanceOf(PluginSettingsTab);
@@ -528,10 +618,11 @@ describe('PluginSettingsTab', () => {
 
   it('should keep Core inline and expose every other group as a navigable sub-page', async () => {
     const { tab } = await createTab();
-    // The suggestion banner rides at the top as a bare ROW: Obsidian never calls `display()` once the
-    // Declarative definitions are non-empty, so there is nowhere else to put it.
-    const [banner, coreGroup, ...pages] = tab.getSettingDefinitions();
-    expect(castTo<SettingDefinitionRender>(banner).name).toBe('');
+    // Both banners ride at the top as bare ROWS: Obsidian never calls `display()` once the declarative
+    // Definitions are non-empty, so there is nowhere else to put them.
+    const [suggestionBanner, conflictBanner, coreGroup, ...pages] = tab.getSettingDefinitions();
+    expect(castTo<SettingDefinitionRender>(suggestionBanner).name).toBe('');
+    expect(castTo<SettingDefinitionRender>(conflictBanner).name).toBe('');
 
     const core = castTo<SettingDefinitionGroup>(coreGroup);
     expect(core.type).toBe('group');

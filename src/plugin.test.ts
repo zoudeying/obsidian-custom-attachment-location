@@ -8,6 +8,10 @@ import type {
 /* eslint-enable perfectionist/sort-named-imports -- Only the aliased import above is exempt. */
 import type { DisposableEx } from 'obsidian-dev-utils/disposable';
 import type { CommandHandler } from 'obsidian-dev-utils/obsidian/command-handlers/command-handler';
+import type {
+  PluginConflict,
+  PluginGateComponent
+} from 'obsidian-dev-utils/obsidian/components/plugin-gate-component';
 import type { NotebookNavigatorMenuDispose } from 'obsidian-dev-utils/obsidian/notebook-navigator';
 import type { PluginApiContract } from 'obsidian-dev-utils/obsidian/plugin/plugin-api';
 import type { Mock } from 'vitest';
@@ -20,6 +24,7 @@ import {
 import { castTo } from 'obsidian-dev-utils/object-utils';
 import { CommandHandlerComponent } from 'obsidian-dev-utils/obsidian/command-handlers/command-handler-component';
 import { OpenDemoVaultCommandHandler } from 'obsidian-dev-utils/obsidian/command-handlers/open-demo-vault-command-handler';
+import { PluginConflictSeverity } from 'obsidian-dev-utils/obsidian/components/plugin-gate-component';
 import { PluginSettingsTabComponent } from 'obsidian-dev-utils/obsidian/components/plugin-settings-tab-component';
 import { PluginSuggestionComponent } from 'obsidian-dev-utils/obsidian/components/plugin-suggestion-component';
 import { RenameDeleteHandlerComponent } from 'obsidian-dev-utils/obsidian/components/rename-delete-handler-component';
@@ -266,6 +271,20 @@ interface MigrationParamsProbe {
   readonly sourcePluginId: string;
 }
 
+// `getPluginConflicts` is protected on the base — the declaration is for the library, not for callers —
+// So a test reads it through a probe rather than widening the plugin's own surface.
+interface PluginConflictsProbe {
+  getPluginConflicts(): PluginConflict[];
+}
+
+interface PluginGateProbe {
+  readonly pluginGateComponent: PluginGateComponent;
+}
+
+interface SettingsTabParamsProbe {
+  getPluginGateComponent(): PluginGateComponent;
+}
+
 interface SuggestionParamsProbe {
   isSuggestionDeclined(): boolean;
   setSuggestionDeclined(isDeclined: boolean): Promise<void>;
@@ -374,6 +393,43 @@ describe('Plugin', () => {
     ]);
     expect(AppSaveAttachmentPatchComponent).toHaveBeenCalledOnce();
     expect(TokenizedStringLanguageComponent).toHaveBeenCalledOnce();
+  });
+
+  describe('Consistent Attachments and Links overlap', () => {
+    it('should declare it as a warning rather than a refusal to run', async () => {
+      const plugin = new Plugin(app, manifest);
+      await plugin.onload();
+
+      const conflicts = castTo<PluginConflictsProbe>(plugin).getPluginConflicts();
+
+      expect(conflicts).toHaveLength(1);
+      const [conflict] = conflicts;
+      expect(conflict?.pluginId).toBe('consistent-attachments-and-links');
+      expect(conflict?.pluginName).toBe('Consistent Attachments and Links');
+      // Duplicate palette entries and doubled work are annoying, not vault-corrupting, so both plugins
+      // Keep running.
+      expect(conflict?.severity).toBe(PluginConflictSeverity.Warn);
+      // A RANGE closed at that plugin's next major, not a minimum: the release that drops collecting has
+      // Not shipped, so every released version still overlaps.
+      expect(conflict?.conflictingVersionRange).toBe('<5.0.0');
+      expect(conflict?.reason).toContain('Collect attachments in entire vault');
+    });
+
+    // The settings tab takes an ACCESSOR rather than the gate itself: the gate is what loads the feature
+    // Surface, so at the moment `onloadImpl` builds the tab the base has not assigned it yet, and reading
+    // It eagerly throws.
+    it('should hand the settings tab a lazy route to the plugin gate', async () => {
+      const plugin = new Plugin(app, manifest);
+      await plugin.onload();
+
+      const call = vi.mocked(PluginSettingsTab).mock.calls[0];
+      if (!call) {
+        throw new Error('PluginSettingsTab was not constructed.');
+      }
+
+      const params = castTo<SettingsTabParamsProbe>(call[0]);
+      expect(params.getPluginGateComponent()).toBe(castTo<PluginGateProbe>(plugin).pluginGateComponent);
+    });
   });
 
   describe('collectAttachmentsInAbstractFiles', () => {

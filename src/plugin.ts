@@ -1,7 +1,12 @@
 import type { TAbstractFile } from 'obsidian';
+import type {
+  PluginConflict,
+  PluginGateComponent
+} from 'obsidian-dev-utils/obsidian/components/plugin-gate-component';
 import type { TranslationsMap } from 'obsidian-dev-utils/obsidian/i18n/i18n';
 
 import { OpenDemoVaultCommandHandler } from 'obsidian-dev-utils/obsidian/command-handlers/open-demo-vault-command-handler';
+import { PluginConflictSeverity } from 'obsidian-dev-utils/obsidian/components/plugin-gate-component';
 import { PluginSettingsTabComponent } from 'obsidian-dev-utils/obsidian/components/plugin-settings-tab-component';
 import { PluginSuggestionComponent } from 'obsidian-dev-utils/obsidian/components/plugin-suggestion-component';
 import { SettingsMigrationComponent } from 'obsidian-dev-utils/obsidian/components/settings-migration-component';
@@ -31,6 +36,11 @@ import { DeleteUnusedAttachmentsInFileCommandHandler } from './command-handlers/
 import { GoToAttachmentFolderCommandHandler } from './command-handlers/go-to-attachment-folder-command-handler.ts';
 import { GoToOwningNoteCommandHandler } from './command-handlers/go-to-owning-note-command-handler.ts';
 import { MoveAttachmentToProperFolderCommandHandler } from './command-handlers/move-attachment-to-proper-folder-command-handler.ts';
+import {
+  CONSISTENT_ATTACHMENTS_AND_LINKS_COLLECTING_VERSION_RANGE,
+  CONSISTENT_ATTACHMENTS_AND_LINKS_PLUGIN_ID,
+  CONSISTENT_ATTACHMENTS_AND_LINKS_PLUGIN_NAME
+} from './consistent-attachments-and-links.ts';
 import { CustomAttachmentLocationComponent } from './custom-attachment-location-component.ts';
 import { HandedOverSettingsComponent } from './handed-over-settings-component.ts';
 import { translationsMap } from './i18n/locales/translations-map.ts';
@@ -73,6 +83,18 @@ export class Plugin extends PluginBase {
 
   protected override createTranslationsMap(): TranslationsMap {
     return translationsMap;
+  }
+
+  protected override getPluginConflicts(): PluginConflict[] {
+    return [
+      {
+        conflictingVersionRange: CONSISTENT_ATTACHMENTS_AND_LINKS_COLLECTING_VERSION_RANGE,
+        pluginId: CONSISTENT_ATTACHMENTS_AND_LINKS_PLUGIN_ID,
+        pluginName: CONSISTENT_ATTACHMENTS_AND_LINKS_PLUGIN_NAME,
+        reason: t(($) => $.pluginConflict.consistentAttachmentsAndLinks.reason),
+        severity: PluginConflictSeverity.Warn
+      }
+    ];
   }
 
   protected override async onloadImpl(): Promise<void> {
@@ -196,6 +218,8 @@ export class Plugin extends PluginBase {
       new PluginSettingsTabComponent({
         plugin: this,
         pluginSettingsTab: new PluginSettingsTab({
+          // Deliberately lazy: the gate is what loads this method, so the base has not assigned it yet.
+          getPluginGateComponent: (): PluginGateComponent => this.pluginGateComponent,
           plugin: this,
           pluginSettingsComponent,
           pluginSuggestionComponent
