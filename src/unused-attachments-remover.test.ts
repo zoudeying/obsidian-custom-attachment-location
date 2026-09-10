@@ -326,6 +326,34 @@ describe('UnusedAttachmentsRemover', () => {
       expect(mockGetCacheSafe).toHaveBeenCalledWith(app, childNote);
     });
 
+    // A folder inside a walked folder arrives through the same callback as a file. It is skipped here and
+    // Reached on its own, so a nested folder is never mistaken for a note and never scanned as one.
+    it('should skip a folder child while recursing', async () => {
+      const folder = strictProxy<TAbstractFile>({ path: 'folder' });
+      const childFolder = strictProxy<TAbstractFile>({ path: 'folder/nested' });
+      const childNote = createFile('folder/child.md');
+      mockIsFile.mockImplementation((f) => f !== folder && f !== childFolder);
+      mockIsFolder.mockImplementation((f) => f === folder || f === childFolder);
+      mockIsNote.mockImplementation((f) => f === childNote);
+      mockGetCacheSafe.mockResolvedValue(null);
+      const recurseSpy = vi.spyOn(Vault, 'recurseChildren').mockImplementation((root, callback) => {
+        if (root !== folder) {
+          return;
+        }
+
+        callback(childFolder);
+        callback(childNote);
+      });
+
+      try {
+        await runOperation([folder]);
+      } finally {
+        recurseSpy.mockRestore();
+      }
+
+      expect(mockGetCacheSafe).toHaveBeenCalledExactlyOnceWith(app, childNote);
+    });
+
     it('should skip an ignored note without scanning it', async () => {
       const note = createFile('note.md');
       mockIsFile.mockReturnValue(true);
@@ -712,6 +740,26 @@ describe('UnusedAttachmentsRemover', () => {
       });
     });
 
+    // An attachment at the top level of the vault has no parent folder to clean up: `dirname` answers `.`,
+    // A path no folder in the vault has, and the empty-folder cleanup walks UPWARDS from whatever it is
+    // Handed. Recording it would send that walk above the vault root.
+    it('should not record the vault root as a folder to clean up', async () => {
+      const unusedRoot = createFile('root.png');
+      vi.spyOn(Vault, 'recurseChildren').mockImplementation((_root, callback) => {
+        callback(unusedRoot);
+      });
+      mockConfirm.mockResolvedValue(true);
+
+      await runOperation([note]);
+
+      expect(mockTrashSafe).toHaveBeenCalledExactlyOnceWith(app, unusedRoot);
+      expect(mockCleanupEmptyFolders).toHaveBeenCalledExactlyOnceWith({
+        app,
+        emptyFolderBehavior: EmptyFolderBehavior.DeleteWithEmptyParents,
+        folderPaths: []
+      });
+    });
+
     it('should not trash anything when the confirmation is declined', async () => {
       mockConfirm.mockResolvedValue(false);
       await runOperation([note]);
@@ -927,6 +975,24 @@ describe('UnusedAttachmentsRemover', () => {
       await runEntireVaultOperation();
 
       expect(mockTrashSafe).toHaveBeenCalledExactlyOnceWith(app, unitFolder);
+    });
+
+    // More than one candidate is what turns this pass's progress bar on and what makes the ordering
+    // Observable at all: the candidates are sorted by path so the confirmation lists them the same way
+    // Twice running, rather than in whatever order the vault walk happened to yield them.
+    it('should judge several unowned attachments in path order, behind a progress bar', async () => {
+      const later = createFile(`${ORPHAN_FOLDER_PATH}/b-later.png`);
+      const earlier = createFile(`${ORPHAN_FOLDER_PATH}/a-earlier.png`);
+      // Yielded out of order deliberately, so a missing sort would show up in the calls below.
+      vaultFiles = [later, earlier];
+      mockVaultWalk();
+      vi.mocked(settings.isOrphanAttachmentScanCandidate).mockReturnValue(true);
+
+      await runEntireVaultOperation();
+
+      const judgedPaths = mockGetBacklinksForFileSafe.mock.calls.map((call) => castTo<TFile>(call[0].pathOrFile).path);
+      expect(judgedPaths).toStrictEqual([earlier.path, later.path]);
+      expect(mockTrashSafe).toHaveBeenCalledTimes(2);
     });
 
     it('should not judge an attachment the note-driven pass already listed', async () => {
