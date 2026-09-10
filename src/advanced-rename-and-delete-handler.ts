@@ -14,6 +14,7 @@
  */
 
 import type { PluginApiContract } from 'obsidian-dev-utils/obsidian/plugin/plugin-api';
+import type { SettingsMigrationApi } from 'obsidian-dev-utils/obsidian/plugin/settings-migration-api';
 
 import { EmptyFolderBehavior } from 'obsidian-dev-utils/obsidian/vault';
 
@@ -23,8 +24,13 @@ import { EmptyFolderBehavior } from 'obsidian-dev-utils/obsidian/vault';
  * It publishes contract version `1.1.0`, so consumers ask for `^1`. The reads are SYNCHRONOUS by design:
  * this plugin calls them from `checkCallback(isChecking): boolean`, from settings-row `disabled` predicates,
  * and from loops over vault files — none of which can await.
+ *
+ * `migrateSettings` is inherited rather than re-declared: it is the generic handover envelope, and taking it
+ * from `SettingsMigrationApi` is what gives both ends of that handover one declaration to compile against
+ * instead of two copies that drift in silence. What stays declared here is what is genuinely this pair's
+ * own — the read-back members below, and the {@link MigratableSettings} payload.
  */
-export interface AdvancedRenameAndDeleteHandlerApi {
+export interface AdvancedRenameAndDeleteHandlerApi extends SettingsMigrationApi<MigratableSettings> {
   /**
    * The settings this plugin handed over and still reads.
    *
@@ -53,17 +59,6 @@ export interface AdvancedRenameAndDeleteHandlerApi {
    * @returns Whether the file is treated as an attachment.
    */
   isTreatedAsAttachment(path: string): boolean;
-
-  /**
-   * Offers the user a set of settings values this plugin proposes, and applies what they approve.
-   *
-   * Resolves only once the dialog is closed, so the caller learns whether the migration happened and can
-   * set — or withhold — its own one-shot flag on that answer.
-   *
-   * @param params - The proposal.
-   * @returns What the user approved.
-   */
-  migrateSettings(params: MigrateSettingsParams): Promise<MigrateSettingsResult>;
 }
 
 /**
@@ -105,32 +100,6 @@ export interface MigratableSettings {
   readonly shouldRenameAttachmentFolder?: boolean;
   readonly shouldRescueSharedAttachments?: boolean;
   readonly treatAsAttachmentExtensions?: readonly string[];
-}
-
-/**
- * Parameters for {@link AdvancedRenameAndDeleteHandlerApi.migrateSettings}.
- */
-export interface MigrateSettingsParams {
-  /**
-   * The values this plugin proposes.
-   */
-  readonly proposedSettings: MigratableSettings;
-
-  /**
-   * The `manifest.id` of the plugin making the proposal, so the dialog can say whose settings these are.
-   */
-  readonly sourcePluginId: string;
-}
-
-/**
- * The outcome of {@link AdvancedRenameAndDeleteHandlerApi.migrateSettings}.
- */
-export interface MigrateSettingsResult {
-  /**
-   * Whether the user approved the migration. `false` means they cancelled and nothing was written — the
-   * caller must NOT record the migration as done.
-   */
-  readonly isApplied: boolean;
 }
 
 export const ADVANCED_RENAME_AND_DELETE_HANDLER_PLUGIN_ID = 'advanced-rename-and-delete-handler';
