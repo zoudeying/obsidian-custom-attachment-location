@@ -122,6 +122,14 @@ export const defaultTranslations = {
     notePathIsIgnored: 'Note path is ignored',
     noUnusedAttachments: 'No unused attachments found.'
   },
+  pluginConflict: {
+    consistentAttachmentsAndLinks: {
+      reason: 'Both plugins add the same attachment collecting commands, under the same names:'
+        + ' Collect attachments in entire vault, Collect attachments in current folder,'
+        + ' Collect attachments in current note and Move attachment to proper folder.'
+        + ' Each one appears twice in the command palette, and running either copy does the work twice.'
+    }
+  },
   pluginSettings: {
     attachmentRenameMode: {
       all: {

@@ -3,6 +3,7 @@ import type {
   SettingDefinitionRender,
   TextComponent
 } from 'obsidian';
+import type { PluginGateComponent } from 'obsidian-dev-utils/obsidian/components/plugin-gate-component';
 import type { PluginSuggestionComponent } from 'obsidian-dev-utils/obsidian/components/plugin-suggestion-component';
 import type {
   BindOptionsExtended,
@@ -56,11 +57,23 @@ const bindOptionsWithTrim: BindOptionsExtended<PluginSettings, string, Condition
 };
 
 interface PluginSettingsTabConstructorParams extends PluginSettingsTabBaseConstructorParams<PluginSettings> {
+  /**
+   * Reaches the plugin's gate, LAZILY.
+   *
+   * A function rather than the component itself, because there is no component to hand over yet when this
+   * tab is built: the base assigns `pluginGateComponent` only after the gate has loaded, and the gate loads
+   * the feature surface — `onloadImpl`, where this tab is constructed — as it loads. Reading it eagerly
+   * therefore throws. By the time a row renders, the assignment has long since happened.
+   *
+   * @returns The plugin gate component.
+   */
+  getPluginGateComponent(this: void): PluginGateComponent;
   readonly pluginSettingsComponent: PluginSettingsComponent;
   readonly pluginSuggestionComponent: PluginSuggestionComponent;
 }
 
 export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
+  private readonly getPluginGateComponent: (this: void) => PluginGateComponent;
   // Kept so this plugin can leave ITSELF out of the plugin picker; the base class does not expose `plugin`.
   private readonly ownPluginId: string;
   private readonly pluginSettingsComponent2: PluginSettingsComponent;
@@ -68,6 +81,7 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
 
   public constructor(params: PluginSettingsTabConstructorParams) {
     super(params);
+    this.getPluginGateComponent = params.getPluginGateComponent;
     this.ownPluginId = params.plugin.manifest.id;
     this.pluginSettingsComponent2 = params.pluginSettingsComponent;
     this.pluginSuggestionComponent = params.pluginSuggestionComponent;
@@ -91,6 +105,21 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
         },
         searchable: false,
         visible: () => this.pluginSuggestionComponent.getSuggestedPluginState() !== SuggestedPluginState.Enabled
+      }),
+      // The overlap banner travels as a row for the same reason the suggestion banner above does. It cannot
+      // Take a `visible` predicate yet: the library version this plugin compiles against renders the banner
+      // But does not expose whether there is one to render, so the row is hidden after the fact when nothing
+      // Was written into it. Swap this for a predicate once the floor moves.
+      this.settingEx({
+        name: '',
+        render: (setting) => {
+          setting.settingEl.empty();
+          this.getPluginGateComponent().renderConflictWarningBanner(setting.settingEl);
+          if (!setting.settingEl.hasChildNodes()) {
+            setting.settingEl.hide();
+          }
+        },
+        searchable: false
       }),
       this.settingGroupEx({
         heading: t(($) => $.pluginSettingsTab.groups.core),
