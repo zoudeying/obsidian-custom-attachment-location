@@ -9,6 +9,7 @@ import type {
 import type { DisposableEx } from 'obsidian-dev-utils/disposable';
 import type { CommandHandler } from 'obsidian-dev-utils/obsidian/command-handlers/command-handler';
 import type { NotebookNavigatorMenuDispose } from 'obsidian-dev-utils/obsidian/notebook-navigator';
+import type { PluginApiContract } from 'obsidian-dev-utils/obsidian/plugin/plugin-api';
 import type { Mock } from 'vitest';
 
 import { Component } from 'obsidian';
@@ -22,6 +23,7 @@ import { OpenDemoVaultCommandHandler } from 'obsidian-dev-utils/obsidian/command
 import { PluginSettingsTabComponent } from 'obsidian-dev-utils/obsidian/components/plugin-settings-tab-component';
 import { PluginSuggestionComponent } from 'obsidian-dev-utils/obsidian/components/plugin-suggestion-component';
 import { RenameDeleteHandlerComponent } from 'obsidian-dev-utils/obsidian/components/rename-delete-handler-component';
+import { SettingsMigrationComponent } from 'obsidian-dev-utils/obsidian/components/settings-migration-component';
 import { NOTEBOOK_NAVIGATOR_PLUGIN_ID } from 'obsidian-dev-utils/obsidian/notebook-navigator';
 import { App } from 'obsidian-test-mocks/obsidian';
 import {
@@ -32,6 +34,8 @@ import {
   it,
   vi
 } from 'vitest';
+
+import type { MigratableSettings } from './advanced-rename-and-delete-handler.ts';
 
 import { ArrayBufferMap } from './array-buffer-map.ts';
 import { AttachmentCollector } from './attachment-collector.ts';
@@ -53,7 +57,6 @@ import { MarkdownUrlMap } from './markdown-url-map.ts';
 import { AppSaveAttachmentPatchComponent } from './patches/app-save-attachment-patch-component.ts';
 import { PluginSettingsComponent } from './plugin-settings-component.ts';
 import { PluginSettingsTab } from './plugin-settings-tab.ts';
-import { RenameDeleteHandlerMigrationComponent } from './rename-delete-handler-migration-component.ts';
 import { TokenValidator } from './token-validator.ts';
 import { TokenizedStringLanguageComponent } from './tokenized-string-language-component.ts';
 import { UnusedAttachmentsRemover } from './unused-attachments-remover.ts';
@@ -62,20 +65,25 @@ import { UnusedAttachmentsRemover } from './unused-attachments-remover.ts';
 
 interface StubbedSettings {
   isAdvancedRenameAndDeleteHandlerSuggestionDeclined: boolean;
-  proposedRenameDeleteSettings: null;
+  proposedRenameDeleteSettings: MigratableSettings | null;
 }
 
-const hoisted = vi.hoisted(() => ({
-  editAndSave: vi.fn((settingsEditor: (settings: StubbedSettings) => void): Promise<void> => {
-    settingsEditor(hoisted.settings);
-    return noopAsync();
-  }),
-  isNoteEx: vi.fn((_path: string): boolean => true),
-  settings: {
+const hoisted = vi.hoisted(() => {
+  // Annotated rather than inferred: the pending value starts `null`, and an inferred literal type would
+  // Make it permanently `null`, so no test could park a proposal in it.
+  const settings: StubbedSettings = {
     isAdvancedRenameAndDeleteHandlerSuggestionDeclined: false,
     proposedRenameDeleteSettings: null
-  }
-}));
+  };
+  return {
+    editAndSave: vi.fn((settingsEditor: (settings: StubbedSettings) => void): Promise<void> => {
+      settingsEditor(settings);
+      return noopAsync();
+    }),
+    isNoteEx: vi.fn((_path: string): boolean => true),
+    settings
+  };
+});
 
 // --- Collaborator dev-utils components added as children: stub as constructor spies returning a real Component so the real addChild lifecycle can load them while capturing constructor args. ---
 
@@ -122,12 +130,16 @@ vi.mock('./handed-over-settings-component.ts', () => ({
   })
 }));
 
-vi.mock('./rename-delete-handler-migration-component.ts', () => ({
-  // eslint-disable-next-line prefer-arrow-callback -- a vi.fn constructor stub must be a function (not an arrow) so `new` works and returns a loadable Component.
-  RenameDeleteHandlerMigrationComponent: vi.fn(function renameDeleteHandlerMigrationComponentStub() {
-    return new Component();
-  })
-}));
+vi.mock('obsidian-dev-utils/obsidian/components/settings-migration-component', async (importOriginal) => {
+  const original = await importOriginal<typeof import('obsidian-dev-utils/obsidian/components/settings-migration-component')>();
+  return {
+    ...original,
+    // eslint-disable-next-line prefer-arrow-callback -- a vi.fn constructor stub must be a function (not an arrow) so `new` works and returns a loadable Component.
+    SettingsMigrationComponent: vi.fn(function settingsMigrationComponentStub() {
+      return new Component();
+    })
+  };
+});
 
 vi.mock('./array-buffer-map.ts', () => ({
   ArrayBufferMap: vi.fn()
@@ -245,9 +257,26 @@ interface CustomAttachmentLocationParamsProbe {
   pluginDirectory: string;
 }
 
+interface MigrationParamsProbe {
+  readonly apiVersionRange: string;
+  readonly contract: PluginApiContract;
+  getProposedSettings(): MigratableSettings | null;
+  readonly providerPluginId: string;
+  retireProposedSettings(): Promise<void>;
+  readonly sourcePluginId: string;
+}
+
 interface SuggestionParamsProbe {
   isSuggestionDeclined(): boolean;
   setSuggestionDeclined(isDeclined: boolean): Promise<void>;
+}
+
+function getMigrationParams(): MigrationParamsProbe {
+  const call = vi.mocked(SettingsMigrationComponent).mock.calls[0];
+  if (!call) {
+    throw new Error('SettingsMigrationComponent was not constructed.');
+  }
+  return castTo<MigrationParamsProbe>(call[0]);
 }
 
 function getSuggestionParams(): SuggestionParamsProbe {
@@ -277,8 +306,9 @@ let getPluginMock: Mock<(pluginId: string) => null | PluginOriginal>;
 beforeEach(() => {
   vi.clearAllMocks();
   hoisted.isNoteEx.mockReturnValue(true);
-  // A plain object, so `clearAllMocks` does not reset it and a test that flips the flag would leak.
+  // A plain object, so `clearAllMocks` does not reset it and a test that flips a value would leak.
   hoisted.settings.isAdvancedRenameAndDeleteHandlerSuggestionDeclined = false;
+  hoisted.settings.proposedRenameDeleteSettings = null;
   const appMock = App.createConfigured__();
   appMock.workspace.onLayoutReady = vi.fn((callback: () => void) => {
     callback();
@@ -327,7 +357,7 @@ describe('Plugin', () => {
     expect(RenameDeleteHandlerComponent).not.toHaveBeenCalled();
     expect(HandedOverSettingsComponent).toHaveBeenCalledOnce();
     expect(PluginSuggestionComponent).toHaveBeenCalledOnce();
-    expect(RenameDeleteHandlerMigrationComponent).toHaveBeenCalledOnce();
+    expect(SettingsMigrationComponent).toHaveBeenCalledOnce();
     expect(AttachmentCollector).toHaveBeenCalledOnce();
     expect(UnusedAttachmentsRemover).toHaveBeenCalledOnce();
     // The base separately auto-registers its own handler (e.g. UnlockActiveNoteCommandHandler), so assert the plugin's own registration by its handlers rather than the total call count.
@@ -416,6 +446,59 @@ describe('Plugin', () => {
 
       expect(hoisted.editAndSave).toHaveBeenCalled();
       expect(hoisted.settings.isAdvancedRenameAndDeleteHandlerSuggestionDeclined).toBe(true);
+    });
+  });
+
+  describe('Advanced Rename and Delete Handler settings migration', () => {
+    it('should offer the migration to the plugin that now owns rename/delete', async () => {
+      const plugin = new Plugin(app, manifest);
+      await plugin.onload();
+
+      const params = getMigrationParams();
+      expect(params.providerPluginId).toBe('advanced-rename-and-delete-handler');
+      expect(params.sourcePluginId).toBe(manifest.id);
+      expect(params.apiVersionRange).toBe('^1');
+    });
+
+    // Deliberately narrower than the read-back's contract: a user on a provider old enough to publish only
+    // `migrateSettings` is exactly the user who still has settings to migrate, so demanding the read-back
+    // Members here would refuse them the offer.
+    it('should demand only migrateSettings, so an older provider can still be migrated to', async () => {
+      const plugin = new Plugin(app, manifest);
+      await plugin.onload();
+
+      expect(getMigrationParams().contract).toStrictEqual({ migrateSettings: {} });
+    });
+
+    it('should offer nothing while no legacy values are pending', async () => {
+      const plugin = new Plugin(app, manifest);
+      await plugin.onload();
+
+      expect(getMigrationParams().getProposedSettings()).toBeNull();
+    });
+
+    it('should offer the pending values once the settings carry them', async () => {
+      const plugin = new Plugin(app, manifest);
+      await plugin.onload();
+
+      const proposal = { shouldHandleDeletions: true, shouldHandleRenames: true };
+      hoisted.settings.proposedRenameDeleteSettings = proposal;
+
+      expect(getMigrationParams().getProposedSettings()).toBe(proposal);
+    });
+
+    // `editAndSave`, not `setProperty`: a retirement that only edits the in-memory state is forgotten on the
+    // Next reload, so an applied migration would be offered forever.
+    it('should persist the retirement rather than only holding it in memory', async () => {
+      const plugin = new Plugin(app, manifest);
+      await plugin.onload();
+      hoisted.settings.proposedRenameDeleteSettings = { shouldHandleRenames: true };
+      hoisted.editAndSave.mockClear();
+
+      await getMigrationParams().retireProposedSettings();
+
+      expect(hoisted.editAndSave).toHaveBeenCalledOnce();
+      expect(hoisted.settings.proposedRenameDeleteSettings).toBeNull();
     });
   });
 

@@ -4,13 +4,18 @@ import type { TranslationsMap } from 'obsidian-dev-utils/obsidian/i18n/i18n';
 import { OpenDemoVaultCommandHandler } from 'obsidian-dev-utils/obsidian/command-handlers/open-demo-vault-command-handler';
 import { PluginSettingsTabComponent } from 'obsidian-dev-utils/obsidian/components/plugin-settings-tab-component';
 import { PluginSuggestionComponent } from 'obsidian-dev-utils/obsidian/components/plugin-suggestion-component';
+import { SettingsMigrationComponent } from 'obsidian-dev-utils/obsidian/components/settings-migration-component';
 import { PluginDataHandler } from 'obsidian-dev-utils/obsidian/data-handler';
 import { t } from 'obsidian-dev-utils/obsidian/i18n/i18n';
 import { PluginBase } from 'obsidian-dev-utils/obsidian/plugin/plugin';
 import { PluginEventSourceImpl } from 'obsidian-dev-utils/obsidian/plugin/plugin-event-source';
 import { ValueWrapper } from 'obsidian-dev-utils/value-wrapper';
 
+import type { MigratableSettings } from './advanced-rename-and-delete-handler.ts';
+
 import {
+  ADVANCED_RENAME_AND_DELETE_HANDLER_API_VERSION_RANGE,
+  ADVANCED_RENAME_AND_DELETE_HANDLER_MIGRATION_API_CONTRACT,
   ADVANCED_RENAME_AND_DELETE_HANDLER_PLUGIN_ID,
   ADVANCED_RENAME_AND_DELETE_HANDLER_PLUGIN_NAME
 } from './advanced-rename-and-delete-handler.ts';
@@ -37,7 +42,6 @@ import { NoteOwnerResolver } from './note-owner-resolver.ts';
 import { AppSaveAttachmentPatchComponent } from './patches/app-save-attachment-patch-component.ts';
 import { PluginSettingsComponent } from './plugin-settings-component.ts';
 import { PluginSettingsTab } from './plugin-settings-tab.ts';
-import { RenameDeleteHandlerMigrationComponent } from './rename-delete-handler-migration-component.ts';
 import { TokenValidator } from './token-validator.ts';
 import { TokenizedStringLanguageComponent } from './tokenized-string-language-component.ts';
 import { UnusedAttachmentsRemover } from './unused-attachments-remover.ts';
@@ -113,9 +117,21 @@ export class Plugin extends PluginBase {
     );
 
     this.addChild(
-      new RenameDeleteHandlerMigrationComponent({
+      new SettingsMigrationComponent<MigratableSettings>({
+        apiVersionRange: ADVANCED_RENAME_AND_DELETE_HANDLER_API_VERSION_RANGE,
         app: this.app,
+        // Deliberately NARROWER than the read-back's contract: migrating needs only `migrateSettings`,
+        // Which has been published since contract `1.0.0`. Asking for more here would refuse to offer the
+        // Migration to a user on an older provider — which is exactly the user who has settings to migrate.
+        contract: ADVANCED_RENAME_AND_DELETE_HANDLER_MIGRATION_API_CONTRACT,
+        getProposedSettings: (): MigratableSettings | null => pluginSettingsComponent.settings.proposedRenameDeleteSettings,
         pluginSettingsComponent,
+        providerPluginId: ADVANCED_RENAME_AND_DELETE_HANDLER_PLUGIN_ID,
+        retireProposedSettings: async (): Promise<void> => {
+          await pluginSettingsComponent.editAndSave((settings) => {
+            settings.proposedRenameDeleteSettings = null;
+          });
+        },
         sourcePluginId: this.manifest.id
       })
     );
