@@ -31,7 +31,6 @@ describe('PluginSettings', () => {
       expect(settings.shouldSkipCollectingAttachmentsReferencedByRawPath).toBe(false);
       expect(settings.specialCharacters).toBe(String.raw`#^[]|*\<>:?/`);
       expect(settings.specialCharactersReplacement).toBe('-');
-      expect(settings.isAdvancedRenameAndDeleteHandlerSuggestionDeclined).toBe(false);
       expect(settings.proposedRenameDeleteSettings).toBeNull();
       expect(settings.timeoutInSeconds).toBe(5);
       expect(settings.customTokensStr).toBe('');

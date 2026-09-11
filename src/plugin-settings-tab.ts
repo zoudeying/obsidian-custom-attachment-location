@@ -4,7 +4,6 @@ import type {
   TextComponent
 } from 'obsidian';
 import type { PluginGateComponent } from 'obsidian-dev-utils/obsidian/components/plugin-gate-component';
-import type { PluginSuggestionComponent } from 'obsidian-dev-utils/obsidian/components/plugin-suggestion-component';
 import type {
   BindOptionsExtended,
   PluginSettingsTabBaseConstructorParams
@@ -19,7 +18,6 @@ import {
   convertAsyncToSync,
   invokeAsyncSafely
 } from 'obsidian-dev-utils/async';
-import { SuggestedPluginState } from 'obsidian-dev-utils/obsidian/components/plugin-suggestion-component';
 import { appendCodeBlock } from 'obsidian-dev-utils/obsidian/html-element';
 import { t } from 'obsidian-dev-utils/obsidian/i18n/i18n';
 import { confirm } from 'obsidian-dev-utils/obsidian/modals/confirm';
@@ -69,7 +67,6 @@ interface PluginSettingsTabConstructorParams extends PluginSettingsTabBaseConstr
    */
   getPluginGateComponent(this: void): PluginGateComponent;
   readonly pluginSettingsComponent: PluginSettingsComponent;
-  readonly pluginSuggestionComponent: PluginSuggestionComponent;
 }
 
 export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
@@ -77,14 +74,12 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
   // Kept so this plugin can leave ITSELF out of the plugin picker; the base class does not expose `plugin`.
   private readonly ownPluginId: string;
   private readonly pluginSettingsComponent2: PluginSettingsComponent;
-  private readonly pluginSuggestionComponent: PluginSuggestionComponent;
 
   public constructor(params: PluginSettingsTabConstructorParams) {
     super(params);
     this.getPluginGateComponent = params.getPluginGateComponent;
     this.ownPluginId = params.plugin.manifest.id;
     this.pluginSettingsComponent2 = params.pluginSettingsComponent;
-    this.pluginSuggestionComponent = params.pluginSuggestionComponent;
   }
 
   public override hide(): void {
@@ -94,22 +89,15 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
 
   protected override getSettingDefinitionItems(): SettingDefinitionItem[] {
     return [
-      // The suggestion banner has to travel as a ROW: Obsidian renders the declarative definitions and never
+      // The overlap banner has to travel as a ROW: Obsidian renders the declarative definitions and never
       // Calls `display()` once `getSettingDefinitions()` is non-empty, so there is no container to write into
       // Otherwise. The row body is emptied first, leaving the Setting element as a bare host for the banner.
-      this.settingEx({
-        name: '',
-        render: (setting) => {
-          setting.settingEl.empty();
-          this.pluginSuggestionComponent.renderBanner(setting.settingEl);
-        },
-        searchable: false,
-        visible: () => this.pluginSuggestionComponent.getSuggestedPluginState() !== SuggestedPluginState.Enabled
-      }),
-      // The overlap banner travels as a row for the same reason the suggestion banner above does. It cannot
-      // Take a `visible` predicate yet: the library version this plugin compiles against renders the banner
-      // But does not expose whether there is one to render, so the row is hidden after the fact when nothing
-      // Was written into it. Swap this for a predicate once the floor moves.
+      // It cannot take a `visible` predicate yet: the library version this plugin compiles against renders the
+      // Banner but does not expose whether there is one to render, so the row is hidden after the fact when
+      // Nothing was written into it. Swap this for a predicate once the floor moves.
+      //
+      // There is no row for Advanced Rename and Delete Handler: it is a declared dependency, so while it is
+      // Missing this tab is never registered at all and the library's own blocked tab explains what to install.
       this.settingEx({
         name: '',
         render: (setting) => {

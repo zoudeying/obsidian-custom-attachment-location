@@ -61,6 +61,11 @@ const DEMO_VAULT_TIMEOUT_IN_MILLISECONDS = 600_000;
 const DESKTOP_VAULT_CLEANUP_SETUP_FILE = './scripts/vitest-setup-desktop-vault-cleanup.ts';
 
 /**
+ * The desktop and Android projects' global setup: the harness's own, plus this plugin's dependency.
+ */
+const GLOBAL_SETUP_FILE = './scripts/vitest-global-setup.ts';
+
+/**
  * The desktop transport's per-command budget.
  *
  * A whole `evalInObsidian` callback is ONE `Runtime.evaluate`, so this bounds the entire staging +
@@ -138,6 +143,12 @@ export const config = defineObsidianPluginVitestConfig({
     ];
   },
   editContext(context: ObsidianPluginVitestConfigContext): void {
+    // This plugin declares Advanced Rename and Delete Handler as a dependency and loads nothing without it, so
+    // Every vault these projects open has it seeded. The capture projects spread these same objects and so
+    // Inherit it; the demo-vault and performance projects bring setups of their own that seed it too.
+    context.desktop.globalSetup = [GLOBAL_SETUP_FILE];
+    context.android.globalSetup = [GLOBAL_SETUP_FILE];
+
     context.desktop.setupFiles = [...toSetupFileList(context.desktop.setupFiles), DESKTOP_VAULT_CLEANUP_SETUP_FILE];
 
     context.desktop.environmentOptions = {
