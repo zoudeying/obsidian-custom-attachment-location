@@ -130,6 +130,13 @@ export const defaultTranslations = {
         + ' Each one appears twice in the command palette, and running either copy does the work twice.'
     }
   },
+  pluginDependency: {
+    advancedRenameAndDeleteHandler: {
+      reason: 'Custom Attachment Location no longer handles renames and deletions itself.'
+        + ' Advanced Rename and Delete Handler does: it moves a note\'s attachments with the note and cleans up after'
+        + ' a deleted one, and it holds the settings this plugin\'s commands read, such as which paths to skip.'
+    }
+  },
   pluginSettings: {
     attachmentRenameMode: {
       all: {
@@ -552,11 +559,6 @@ export const defaultTranslations = {
       },
       name: 'Timeout in seconds'
     }
-  },
-  pluginSuggestion: {
-    reason: 'Custom Attachment Location no longer handles renames and deletions itself.'
-      + ' Without Advanced Rename and Delete Handler, renaming a note will not move or rename its attachments,'
-      + ' and deleting a note will leave its attachments behind.'
   },
   promptWithPreviewModal: {
     fileNameTitle: 'Rename attachment file',

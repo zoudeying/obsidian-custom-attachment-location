@@ -1,14 +1,15 @@
 import type { TAbstractFile } from 'obsidian';
 import type {
   PluginConflict,
+  PluginDependency,
   PluginGateComponent
 } from 'obsidian-dev-utils/obsidian/components/plugin-gate-component';
 import type { TranslationsMap } from 'obsidian-dev-utils/obsidian/i18n/i18n';
 
+import { Component } from 'obsidian';
 import { OpenDemoVaultCommandHandler } from 'obsidian-dev-utils/obsidian/command-handlers/open-demo-vault-command-handler';
 import { PluginConflictSeverity } from 'obsidian-dev-utils/obsidian/components/plugin-gate-component';
 import { PluginSettingsTabComponent } from 'obsidian-dev-utils/obsidian/components/plugin-settings-tab-component';
-import { PluginSuggestionComponent } from 'obsidian-dev-utils/obsidian/components/plugin-suggestion-component';
 import { SettingsMigrationComponent } from 'obsidian-dev-utils/obsidian/components/settings-migration-component';
 import { PluginDataHandler } from 'obsidian-dev-utils/obsidian/data-handler';
 import { t } from 'obsidian-dev-utils/obsidian/i18n/i18n';
@@ -20,6 +21,7 @@ import type { MigratableSettings } from './advanced-rename-and-delete-handler.ts
 
 import {
   ADVANCED_RENAME_AND_DELETE_HANDLER_API_VERSION_RANGE,
+  ADVANCED_RENAME_AND_DELETE_HANDLER_DEPENDENCY_API_VERSION_RANGE,
   ADVANCED_RENAME_AND_DELETE_HANDLER_MIGRATION_API_CONTRACT,
   ADVANCED_RENAME_AND_DELETE_HANDLER_PLUGIN_ID,
   ADVANCED_RENAME_AND_DELETE_HANDLER_PLUGIN_NAME
@@ -97,6 +99,27 @@ export class Plugin extends PluginBase {
     ];
   }
 
+  /**
+   * Declares Advanced Rename and Delete Handler as a dependency this plugin cannot run without.
+   *
+   * It owns renames and deletions since 12.0.0, and the settings this plugin's own commands read back. Without
+   * it, a note's attachment folder silently stops following the note — and nothing would connect that to a
+   * plugin removed weeks earlier. Declared, this plugin does nothing while it is missing, says why, and installs
+   * it in one click.
+   *
+   * @returns The dependency.
+   */
+  protected override getPluginDependencies(): PluginDependency[] {
+    return [
+      {
+        apiVersionRange: ADVANCED_RENAME_AND_DELETE_HANDLER_DEPENDENCY_API_VERSION_RANGE,
+        pluginId: ADVANCED_RENAME_AND_DELETE_HANDLER_PLUGIN_ID,
+        pluginName: ADVANCED_RENAME_AND_DELETE_HANDLER_PLUGIN_NAME,
+        reason: t(($) => $.pluginDependency.advancedRenameAndDeleteHandler.reason)
+      }
+    ];
+  }
+
   protected override async onloadImpl(): Promise<void> {
     const validatorWrapper = ValueWrapper.unset<TokenValidator>();
 
@@ -119,32 +142,13 @@ export class Plugin extends PluginBase {
     );
     this.pluginSettingsComponent = pluginSettingsComponent;
 
-    const pluginSuggestionComponent = this.addChild(
-      new PluginSuggestionComponent({
-        app: this.app,
-        isSuggestionDeclined: (): boolean => pluginSettingsComponent.settings.isAdvancedRenameAndDeleteHandlerSuggestionDeclined,
-        pluginNoticeComponent: this.pluginNoticeComponent,
-        pluginSettingsComponent,
-        reason: t(($) => $.pluginSuggestion.reason),
-        // `editAndSave`, not `setProperty`: a decline has to outlive a reload, and `setProperty` only edits
-        // The in-memory state, so the suggestion would come back forever.
-        setSuggestionDeclined: async (isDeclined): Promise<void> => {
-          await pluginSettingsComponent.editAndSave((settings) => {
-            settings.isAdvancedRenameAndDeleteHandlerSuggestionDeclined = isDeclined;
-          });
-        },
-        suggestedPluginId: ADVANCED_RENAME_AND_DELETE_HANDLER_PLUGIN_ID,
-        suggestedPluginName: ADVANCED_RENAME_AND_DELETE_HANDLER_PLUGIN_NAME
-      })
-    );
-
     this.addChild(
       new SettingsMigrationComponent<MigratableSettings>({
         apiVersionRange: ADVANCED_RENAME_AND_DELETE_HANDLER_API_VERSION_RANGE,
         app: this.app,
-        // Deliberately NARROWER than the read-back's contract: migrating needs only `migrateSettings`,
-        // Which has been published since contract `1.0.0`. Asking for more here would refuse to offer the
-        // Migration to a user on an older provider — which is exactly the user who has settings to migrate.
+        // Names only what migrating needs, `migrateSettings`. The dependency gate already insists on a provider
+        // New enough for the read-back, so this cannot widen who is offered the migration; it only keeps the
+        // Migration from claiming to need what it does not use.
         contract: ADVANCED_RENAME_AND_DELETE_HANDLER_MIGRATION_API_CONTRACT,
         getProposedSettings: (): MigratableSettings | null => pluginSettingsComponent.settings.proposedRenameDeleteSettings,
         pluginSettingsComponent,
@@ -221,8 +225,7 @@ export class Plugin extends PluginBase {
           // Deliberately lazy: the gate is what loads this method, so the base has not assigned it yet.
           getPluginGateComponent: (): PluginGateComponent => this.pluginGateComponent,
           plugin: this,
-          pluginSettingsComponent,
-          pluginSuggestionComponent
+          pluginSettingsComponent
         })
       })
     );
@@ -248,6 +251,16 @@ export class Plugin extends PluginBase {
     });
     this.attachmentCollector = attachmentCollector;
 
+    // Unloads with the feature surface, which goes whenever the dependency goes away — and this method runs
+    // Again when it comes back. Whatever this method leaves outside its own children is undone here.
+    const featureSurfaceLifetimeComponent = this.addChild(new Component());
+
+    // The field is read by `collectAttachmentsInAbstractFiles`, so it is cleared with the surface: the method
+    // Does nothing in between rather than driving a collector whose components have been torn down.
+    featureSurfaceLifetimeComponent.register(() => {
+      this.attachmentCollector = null;
+    });
+
     const unusedAttachmentsRemover = new UnusedAttachmentsRemover({
       abortSignalComponent: this.abortSignalComponent,
       app: this.app,
@@ -264,7 +277,10 @@ export class Plugin extends PluginBase {
       pluginSettingsComponent
     });
 
-    await this.commandHandlerComponent.registerCommandHandlers(() => [
+    // TODO: Drop the disposal below once obsidian-dev-utils ties commands registered from `onloadImpl` to the
+    // Feature surface. Today they go through the base's universal command component, so they outlive the
+    // Surface: with the dependency gone they would stay in the palette, calling into torn-down components.
+    const commandHandlersDisposable = await this.commandHandlerComponent.registerCommandHandlers(() => [
       new CollectAttachmentsInFileCommandHandler({
         attachmentCollector
       }),
@@ -309,6 +325,9 @@ export class Plugin extends PluginBase {
         pluginVersion: this.manifest.version
       })
     ]);
+    featureSurfaceLifetimeComponent.register(() => {
+      commandHandlersDisposable.dispose();
+    });
 
     this.addChild(
       new AppSaveAttachmentPatchComponent({

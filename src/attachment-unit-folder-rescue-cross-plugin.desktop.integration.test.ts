@@ -6,7 +6,10 @@ import {
   it
 } from 'vitest';
 
-import { downloadReleasedPlugin } from '../scripts/helpers/download-released-plugin.ts';
+import {
+  ADVANCED_RENAME_AND_DELETE_HANDLER_PLUGIN_ID,
+  ADVANCED_RENAME_AND_DELETE_HANDLER_VERSION
+} from '../scripts/helpers/advanced-rename-and-delete-handler-seed.ts';
 
 /*
  * The acceptance run for issue #70, with BOTH real plugins on one live vault.
@@ -25,31 +28,35 @@ import { downloadReleasedPlugin } from '../scripts/helpers/download-released-plu
  * at all. So each side has only ever run against an assumption about the other, which is precisely the seam
  * the reporter stood on.
  *
- * This suite removes the assumption from both ends: the handler's RELEASED build is installed into the vault
- * and enabled, this plugin publishes the designation from its own settings, and the deletion is the real one.
- * A released artifact rather than a local build, deliberately — it is what a user installs, it pins to a
- * version this file can name, and it needs no checkout of the other repo.
+ * This suite removes the assumption from both ends: the handler's RELEASED build is in the vault and enabled,
+ * this plugin publishes the designation from its own settings, and the deletion is the real one. A released
+ * artifact rather than a local build, deliberately — it is what a user installs, it pins to a version this file
+ * can name, and it needs no checkout of the other repo.
+ *
+ * The handler is not installed here any more: this plugin declares it as a dependency and cannot load without
+ * it, so the global setup seeds it into every vault (`scripts/helpers/advanced-rename-and-delete-handler-seed.ts`).
+ * This suite turns on the handler settings it needs and hands them back afterwards, because the handler
+ * outlives the file.
  *
  * Desktop-only for the same reason as every other suite here: this is where the vault runs.
  */
 
 const PLUGIN_ID = 'obsidian-custom-attachment-location';
-const HANDLER_PLUGIN_ID = 'advanced-rename-and-delete-handler';
-const HANDLER_REPO = 'mnaoumov/obsidian-advanced-rename-and-delete-handler';
+const HANDLER_PLUGIN_ID = ADVANCED_RENAME_AND_DELETE_HANDLER_PLUGIN_ID;
 
-/**
- * The handler release under test — **1.3.0**, the first to carry the whole-unit rescue.
+/*
+ * The handler release under test is the seeded one — 1.3.0, the first to carry the whole-unit rescue, pinned in
+ * the seed rather than following `latest`, for the reason stated on `DownloadReleasedPluginParams.version`.
  *
- * Pinned rather than `latest`, for the reason stated on `DownloadReleasedPluginParams.version`: a test that
- * silently follows a moving artifact stops being a statement about anything.
- *
- * The pin is also what makes this suite falsifiable. Pointed at **1.2.0** — the last release before the
- * rescue, which still tears the unit apart — it reproduces issue #70 instead of passing, leaving
- * `a/A.md` and `a/assets/image.png`: the linked file pulled OUT of its unit folder and dropped beside it,
- * and the unreferenced sibling destroyed with the deleted folder. That run is how the harness was shown to
- * detect the defect at all rather than to pass vacuously, and it is a one-line change away.
+ * The pin is also what makes this suite falsifiable. Pointed at 1.2.0 — the last release before the rescue,
+ * which still tears the unit apart — it reproduces issue #70 instead of passing, leaving `a/A.md` and
+ * `a/assets/image.png`: the linked file pulled OUT of its unit folder and dropped beside it, and the
+ * unreferenced sibling destroyed with the deleted folder. That run is how the harness was shown to detect the
+ * defect at all rather than to pass vacuously. Since the seed carries the pin for every suite, repeating it
+ * means pointing the seed at 1.2.0 for one run — which still satisfies the dependency, because 1.2.0 already
+ * publishes contract 1.1.0.
  */
-const HANDLER_VERSION = '1.3.0';
+const HANDLER_VERSION = ADVANCED_RENAME_AND_DELETE_HANDLER_VERSION;
 
 const WAIT_TIMEOUT_IN_MILLISECONDS = 30_000;
 const TEST_TIMEOUT_IN_MILLISECONDS = 180_000;
@@ -65,6 +72,11 @@ interface ProbeResult {
    * Whether the folder the user deleted is gone, so the deletion itself ran.
    */
   readonly doesDeletedFolderStillExist: boolean;
+
+  /**
+   * The version of the handler actually in the vault, so the pin is checked rather than assumed.
+   */
+  readonly handlerVersion: string;
 
   /**
    * Whether the handler plugin loaded and published its API.
@@ -88,18 +100,10 @@ interface ProbeResult {
 
 describe('Deleting a folder whose shared attachment sits in an attachment unit folder (issue #70)', () => {
   it('moves the whole unit into the surviving note\'s area, with the real handler installed', async () => {
-    const handlerFiles = await downloadReleasedPlugin({
-      pluginId: HANDLER_PLUGIN_ID,
-      repo: HANDLER_REPO,
-      version: HANDLER_VERSION
-    });
-
     const result = await evalInObsidian({
       async callback({
         app,
         backlinkCount,
-        handlerMainJs,
-        handlerManifestJson,
         handlerPluginId,
         lib: { waitUntil },
         pluginId,
@@ -117,6 +121,12 @@ describe('Deleting a folder whose shared attachment sits in an attachment unit f
           readonly shouldRescueSharedAttachments?: boolean;
         }
 
+        interface HandedOverSettingsLike {
+          readonly shouldHandleDeletions: boolean;
+          readonly shouldHandleRenames: boolean;
+          readonly shouldRescueSharedAttachments: boolean;
+        }
+
         interface MigrateSettingsParamsLike {
           readonly proposedSettings: MigratableSettingsLike;
           readonly sourcePluginId: string;
@@ -127,6 +137,7 @@ describe('Deleting a folder whose shared attachment sits in an attachment unit f
         }
 
         interface HandlerApiLike {
+          getSettings(): HandedOverSettingsLike;
           migrateSettings(params: MigrateSettingsParamsLike): Promise<MigrateSettingsResultLike>;
         }
 
@@ -234,6 +245,7 @@ describe('Deleting a folder whose shared attachment sits in an attachment unit f
           return {
             diagnostics: 'this plugin\'s live settings object was not found',
             doesDeletedFolderStillExist: false,
+            handlerVersion: '',
             isHandlerLoaded: false,
             isSettingsFound: false,
             survivingRelativePaths: []
@@ -256,25 +268,14 @@ describe('Deleting a folder whose shared attachment sits in an attachment unit f
         const ownerNotePath = `${deletedFolderPath}/Owner.md`;
         const survivorNotePath = `${root}/a/A.md`;
 
-        const handlerFolderPath = `${app.vault.configDir}/plugins/${handlerPluginId}`;
         const priorAttachmentFolderPath = settings.attachmentFolderPath;
         const priorUnitFolderPaths = settings.attachmentUnitFolderPaths;
         const priorAlwaysUpdateLinks = app.vault.getConfig('alwaysUpdateLinks');
-        let isHandlerEnabled = false;
+        let handlerApi: HandlerApiLike | null = null;
+        let priorHandlerSettings: MigratableSettingsLike | null = null;
 
         try {
-          await app.vault.adapter.mkdir(handlerFolderPath);
-          await app.vault.adapter.write(`${handlerFolderPath}/manifest.json`, handlerManifestJson);
-          await app.vault.adapter.write(`${handlerFolderPath}/main.js`, handlerMainJs);
-          await app.plugins.loadManifests();
-
-          /*
-           * `enablePlugin`, not `enablePluginAndSave`: the shared vault must not remember the handler once
-           * this file is done with it.
-           */
-          await app.plugins.enablePlugin(handlerPluginId);
-          isHandlerEnabled = true;
-
+          // Seeded and enabled by the global setup — which is also what let this plugin load at all.
           await waitUntil({
             message: 'the handler plugin never published its API',
             predicate: () => {
@@ -289,13 +290,23 @@ describe('Deleting a folder whose shared attachment sits in an attachment unit f
             return {
               diagnostics: 'the handler plugin loaded but exposes no API',
               doesDeletedFolderStillExist: false,
+              handlerVersion: '',
               isHandlerLoaded: false,
               isSettingsFound: true,
               survivingRelativePaths: []
             };
           }
 
-          await applyHandlerSettings(handlerPlugin.api, {
+          // The handler outlives this file, so what it held is handed back in the `finally` below.
+          handlerApi = handlerPlugin.api;
+          const currentHandlerSettings = handlerApi.getSettings();
+          priorHandlerSettings = {
+            shouldHandleDeletions: currentHandlerSettings.shouldHandleDeletions,
+            shouldHandleRenames: currentHandlerSettings.shouldHandleRenames,
+            shouldRescueSharedAttachments: currentHandlerSettings.shouldRescueSharedAttachments
+          };
+
+          await applyHandlerSettings(handlerApi, {
             shouldHandleDeletions: true,
             shouldHandleRenames: true,
             shouldRescueSharedAttachments: true
@@ -356,6 +367,7 @@ describe('Deleting a folder whose shared attachment sits in an attachment unit f
           return {
             diagnostics: '',
             doesDeletedFolderStillExist: app.vault.getFolderByPath(deletedFolderPath) !== null,
+            handlerVersion: app.plugins.manifests[handlerPluginId]?.version ?? '',
             isHandlerLoaded: true,
             isSettingsFound: true,
             survivingRelativePaths: app.vault.getFiles()
@@ -369,28 +381,22 @@ describe('Deleting a folder whose shared attachment sits in an attachment unit f
           settings.attachmentUnitFolderPaths = priorUnitFolderPaths;
           app.vault.setConfig('alwaysUpdateLinks', priorAlwaysUpdateLinks);
 
-          if (isHandlerEnabled) {
-            await app.plugins.disablePlugin(handlerPluginId);
-          }
-
           /*
            * Through the adapter: a fixture teardown must not travel back through the very delete path the
-           * handler patches, which would make the cleanup part of what is under test.
+           * handler patches, which would make the cleanup part of what is under test. And before the handler's
+           * settings go back, so the deletions are still off-limits to it by the time they are removed.
            */
-          for (const path of [root, handlerFolderPath]) {
-            if (await app.vault.adapter.exists(path)) {
-              await app.vault.adapter.rmdir(path, true);
-            }
+          if (await app.vault.adapter.exists(root)) {
+            await app.vault.adapter.rmdir(root, true);
           }
 
-          // So the removed handler stops appearing in `app.plugins.manifests` for every later suite.
-          await app.plugins.loadManifests();
+          if (handlerApi && priorHandlerSettings) {
+            await applyHandlerSettings(handlerApi, priorHandlerSettings);
+          }
         }
       },
       input: {
         backlinkCount: EXPECTED_BACKLINK_COUNT,
-        handlerMainJs: handlerFiles.mainJs,
-        handlerManifestJson: handlerFiles.manifestJson,
         handlerPluginId: HANDLER_PLUGIN_ID,
         pluginId: PLUGIN_ID,
         waitTimeoutInMilliseconds: WAIT_TIMEOUT_IN_MILLISECONDS
@@ -401,6 +407,8 @@ describe('Deleting a folder whose shared attachment sits in an attachment unit f
     expect(result.diagnostics).toBe('');
     expect(result.isSettingsFound).toBe(true);
     expect(result.isHandlerLoaded).toBe(true);
+    // The pin is only a statement about something if the handler in the vault is the pinned one.
+    expect(result.handlerVersion).toBe(HANDLER_VERSION);
     expect(result.doesDeletedFolderStillExist).toBe(false);
 
     /*

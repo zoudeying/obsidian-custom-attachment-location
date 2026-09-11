@@ -112,6 +112,16 @@ export const ADVANCED_RENAME_AND_DELETE_HANDLER_PLUGIN_NAME = 'Advanced Rename a
 export const ADVANCED_RENAME_AND_DELETE_HANDLER_API_VERSION_RANGE = '^1';
 
 /**
+ * The contract range this plugin REQUIRES before it runs at all — the one declared through
+ * `getPluginDependencies()`.
+ *
+ * Narrower than {@link ADVANCED_RENAME_AND_DELETE_HANDLER_API_VERSION_RANGE} on purpose: the read-back arrived in
+ * contract `1.1.0`, and a provider older than that would open the dependency gate and then fail every read. Asking
+ * for `1.1.0` here turns that into the gate's own "update this plugin" message instead.
+ */
+export const ADVANCED_RENAME_AND_DELETE_HANDLER_DEPENDENCY_API_VERSION_RANGE = '^1.1.0';
+
+/**
  * What the MIGRATION needs — a single method, published since contract `1.0.0`.
  *
  * Supplied to `watchPluginApi` as the consumer's own contract, which wins over the provider's. The two
@@ -139,18 +149,17 @@ export const ADVANCED_RENAME_AND_DELETE_HANDLER_READ_BACK_API_CONTRACT: PluginAp
 };
 
 /**
- * What this plugin uses while Advanced Rename and Delete Handler is not available — not installed, not
- * enabled, or not yet loaded.
+ * What this plugin uses while Advanced Rename and Delete Handler's API is not in hand.
  *
- * These are THIS plugin's own historic defaults rather than the other plugin's, deliberately: a user who
- * declines the suggestion keeps this plugin's behavior as it always was, instead of silently inheriting the
- * defaults of a plugin they chose not to install. `emptyFolderBehavior` is the visible case — this plugin
- * has always defaulted to {@link EmptyFolderBehavior.DeleteWithEmptyParents}, while the other plugin
- * defaults to {@link EmptyFolderBehavior.Keep}.
+ * Rarely reached now that the other plugin is a declared dependency: this plugin's commands, patches and
+ * handlers do not load at all until the dependency gate has seen its API. What is left is the gap the gate
+ * cannot close — a read made while the provider is unloading, between its API being revoked and this plugin's
+ * surface being torn down. A fallback there keeps a read from throwing.
  *
- * A user who HAS the other plugin sees its values instead, which is the whole point of reading them back.
- * A user who does not keeps working defaults, and the values they configured before 12.0.0 are still held in
- * the pending proposal until a migration applies them.
+ * These are THIS plugin's own historic defaults rather than the other plugin's, because the values a user
+ * configured before 12.0.0 were this plugin's. `emptyFolderBehavior` is the visible case — this plugin has
+ * always defaulted to {@link EmptyFolderBehavior.DeleteWithEmptyParents}, while the other plugin defaults to
+ * {@link EmptyFolderBehavior.Keep}.
  */
 export const DEFAULT_HANDED_OVER_SETTINGS: HandedOverSettings = {
   emptyFolderBehavior: EmptyFolderBehavior.DeleteWithEmptyParents,

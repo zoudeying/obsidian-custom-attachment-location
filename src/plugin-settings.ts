@@ -102,13 +102,6 @@ export class PluginSettings {
   // eslint-disable-next-line no-template-curly-in-string -- Valid token.
   public generatedAttachmentFileName = 'file-${date:{momentJsFormat:\'YYYYMMDDHHmmssSSS\'}}';
 
-  /**
-   * Whether the user has dismissed the suggestion to install Advanced Rename and Delete Handler.
-   *
-   * A decline has to outlive a reload, so it is persisted rather than held in memory.
-   */
-  public isAdvancedRenameAndDeleteHandlerSuggestionDeclined = false;
-
   // eslint-disable-next-line no-magic-numbers -- Magic numbers are OK in settings.
   public jpegQuality = 0.8;
   public markdownUrlFormat = '';

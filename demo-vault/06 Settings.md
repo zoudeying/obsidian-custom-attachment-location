@@ -75,10 +75,10 @@ Upgrading offers to move whatever you had set into that plugin, once. Until you 
 
 Five of those settings still matter to **this** plugin's own commands — Collect attachments, Delete unused attachments and Go to owning note all need to know what an attachment is, which paths to skip, which note owns a shared attachment and what to do with an emptied folder. This plugin reads them back from Advanced Rename and Delete Handler rather than keeping a second copy, so there is one place to set them.
 
-Two things follow, and are worth knowing before you decline the suggestion:
+Two things follow:
 
 - **`includePaths` / `excludePaths` now scope both plugins.** Excluding a folder from rename handling also excludes it from this plugin's Collect attachments and Delete unused attachments.
-- **Without Advanced Rename and Delete Handler installed, these fall back to this plugin's own defaults** — an empty path list, an empty priority list, `.excalidraw.md` as the one attachment extension, and `DeleteWithEmptyParents` for emptied folders. Nothing is lost: your values stay in `proposedRenameDeleteSettings` and are offered again the moment that plugin appears. The same fallback applies when it is installed but older than 1.2.0, which is the version that first offers these values back — the migration is still offered, so you can hand your settings over and then update.
+- **This plugin needs Advanced Rename and Delete Handler, and does nothing without it.** While it is missing, disabled, or older than 1.2.0 — the version that first hands these values back — this plugin loads nothing, says why in a notice and in its settings tab, and installs it in one click. It finishes loading the moment the other plugin appears, with no restart. Installing it changes nothing on its own: its defaults do nothing until you turn renames or deletions on, and the values you had set here are offered in its migration dialog. This vault installs it for you on first open.
 
 ## Image conversion and size
 
@@ -106,7 +106,5 @@ Two things follow, and are worth knowing before you decline the suggestion:
   - timeout for the plugin's longer operations (0 means wait indefinitely).
 - `version`
   - the settings schema version; managed by the plugin, not edited by hand.
-- `isAdvancedRenameAndDeleteHandlerSuggestionDeclined`
-  - whether you dismissed the banner suggesting Advanced Rename and Delete Handler. Persisted so a decline survives a reload; managed by the plugin, not edited by hand.
 - `proposedRenameDeleteSettings`
   - the rename/delete values this plugin held before 12.0.0, waiting to be offered to Advanced Rename and Delete Handler. `null` once the migration is applied, and `null` on a fresh install, which is how the plugin knows never to offer a migration of values you never set. Managed by the plugin, not edited by hand.
