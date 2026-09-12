@@ -14,6 +14,16 @@ export const defaultTranslations = {
       title: 'Collecting attachments...'
     }
   },
+  base64Extractor: {
+    confirm: {
+      part1: 'Do you want to extract base64-encoded images to attachments for all notes in folders recursively?',
+      part2: 'This operation cannot be undone.'
+    },
+    progressBar: {
+      message: 'Extracting base64 images {{iterationString}} - \'{{noteFilePath}}\'.',
+      title: 'Extracting base64 images...'
+    }
+  },
   buttons: {
     copy: 'Copy',
     copyAll: 'Copy all',
@@ -42,6 +52,9 @@ export const defaultTranslations = {
     collectAttachmentsEntireVault: 'Collect attachments in entire vault',
     deleteUnusedAttachmentsCurrentNote: 'Delete unused attachments in current note',
     deleteUnusedAttachmentsEntireVault: 'Delete unused attachments in entire vault',
+    extractBase64ImagesCurrentFolder: 'Extract base64 images in current folder',
+    extractBase64ImagesCurrentNote: 'Extract base64 images in current note',
+    extractBase64ImagesEntireVault: 'Extract base64 images in entire vault',
     goToAttachmentFolder: 'Go to attachment folder',
     goToOwningNote: 'Go to owning note',
     moveAttachmentToProperFolder: 'Move attachment to proper folder'
@@ -83,6 +96,8 @@ export const defaultTranslations = {
     collectAttachmentsInFiles: 'Collect attachments in files',
     deleteUnusedAttachmentsInFile: 'Delete unused attachments in file',
     deleteUnusedAttachmentsInFiles: 'Delete unused attachments in files',
+    extractBase64ImagesInFile: 'Extract base64 images in file',
+    extractBase64ImagesInFiles: 'Extract base64 images in files',
     goToAttachmentFolder: 'Go to attachment folder',
     goToOwningNote: 'Go to owning note'
   },
@@ -379,6 +394,13 @@ export const defaultTranslations = {
         part8: 'If the setting is empty, no notes are ignored.'
       },
       name: 'Exclude paths from multiple notes check'
+    },
+    extractBase64Images: {
+      buttonText: 'Extract base64 images',
+      description: {
+        part1: 'Extract all base64-encoded images in the entire vault into physical attachments.'
+      },
+      name: 'Extract base64 images from vault'
     },
     generatedAttachmentFileName: {
       description: {

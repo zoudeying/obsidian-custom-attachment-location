@@ -4,6 +4,7 @@ import type {
   PluginDependency,
   PluginGateComponent
 } from 'obsidian-dev-utils/obsidian/components/plugin-gate-component';
+import type { PluginNoticeComponent } from 'obsidian-dev-utils/obsidian/components/plugin-notice-component';
 import type { TranslationsMap } from 'obsidian-dev-utils/obsidian/i18n/i18n';
 
 import { Component } from 'obsidian';
@@ -15,6 +16,7 @@ import { PluginDataHandler } from 'obsidian-dev-utils/obsidian/data-handler';
 import { t } from 'obsidian-dev-utils/obsidian/i18n/i18n';
 import { PluginBase } from 'obsidian-dev-utils/obsidian/plugin/plugin';
 import { PluginEventSourceImpl } from 'obsidian-dev-utils/obsidian/plugin/plugin-event-source';
+import { ensureNonNullable } from 'obsidian-dev-utils/type-guards';
 import { ValueWrapper } from 'obsidian-dev-utils/value-wrapper';
 
 import type { MigratableSettings } from './advanced-rename-and-delete-handler.ts';
@@ -35,6 +37,8 @@ import { CollectAttachmentsInCurrentFolderCommandHandler } from './command-handl
 import { CollectAttachmentsInFileCommandHandler } from './command-handlers/collect-attachments-in-file-command-handler.ts';
 import { DeleteUnusedAttachmentsEntireVaultCommandHandler } from './command-handlers/delete-unused-attachments-entire-vault-command-handler.ts';
 import { DeleteUnusedAttachmentsInFileCommandHandler } from './command-handlers/delete-unused-attachments-in-file-command-handler.ts';
+import { ExtractBase64ImagesEntireVaultCommandHandler } from './command-handlers/extract-base64-images-entire-vault-command-handler.ts';
+import { ExtractBase64ImagesInFileCommandHandler } from './command-handlers/extract-base64-images-in-file-command-handler.ts';
 import { GoToAttachmentFolderCommandHandler } from './command-handlers/go-to-attachment-folder-command-handler.ts';
 import { GoToOwningNoteCommandHandler } from './command-handlers/go-to-owning-note-command-handler.ts';
 import { MoveAttachmentToProperFolderCommandHandler } from './command-handlers/move-attachment-to-proper-folder-command-handler.ts';
@@ -59,6 +63,33 @@ import { TokenizedStringLanguageComponent } from './tokenized-string-language-co
 import { UnusedAttachmentsRemover } from './unused-attachments-remover.ts';
 
 export class Plugin extends PluginBase {
+  public get abortSignal(): AbortSignal {
+    return this.abortSignalComponent.abortSignal;
+  }
+
+  public get handedOverSettingsComponent(): HandedOverSettingsComponent {
+    return ensureNonNullable(this._handedOverSettingsComponent);
+  }
+
+  public override get pluginNoticeComponent(): PluginNoticeComponent {
+    return super.pluginNoticeComponent;
+  }
+
+  public override set pluginNoticeComponent(value: PluginNoticeComponent) {
+    super.pluginNoticeComponent = value;
+  }
+
+  public override get pluginSettingsComponent(): PluginSettingsComponent {
+    return ensureNonNullable(this._pluginSettingsComponent);
+  }
+
+  public override set pluginSettingsComponent(value: PluginSettingsComponent) {
+    this._pluginSettingsComponent = value;
+    super.pluginSettingsComponent = value;
+  }
+
+  private _handedOverSettingsComponent?: HandedOverSettingsComponent;
+  private _pluginSettingsComponent?: PluginSettingsComponent;
   private attachmentCollector: AttachmentCollector | null = null;
 
   /**
@@ -130,6 +161,7 @@ export class Plugin extends PluginBase {
         app: this.app
       })
     );
+    this._handedOverSettingsComponent = handedOverSettingsComponent;
 
     const pluginSettingsComponent = this.addChild(
       new PluginSettingsComponent({
@@ -140,7 +172,7 @@ export class Plugin extends PluginBase {
         validatorWrapper
       })
     );
-    this.pluginSettingsComponent = pluginSettingsComponent;
+    this._pluginSettingsComponent = pluginSettingsComponent;
 
     this.addChild(
       new SettingsMigrationComponent<MigratableSettings>({
@@ -295,6 +327,12 @@ export class Plugin extends PluginBase {
       }),
       new DeleteUnusedAttachmentsEntireVaultCommandHandler({
         unusedAttachmentsRemover
+      }),
+      new ExtractBase64ImagesInFileCommandHandler({
+        plugin: this
+      }),
+      new ExtractBase64ImagesEntireVaultCommandHandler({
+        plugin: this
       }),
       new MoveAttachmentToProperFolderCommandHandler({
         abortSignalComponent: this.abortSignalComponent,

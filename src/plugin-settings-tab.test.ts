@@ -23,7 +23,10 @@ import type { NumberComponent } from 'obsidian-dev-utils/obsidian/setting-compon
 import { waitForAllAsyncOperations } from 'obsidian-dev-utils/async';
 import { noopAsync } from 'obsidian-dev-utils/function';
 import { castTo } from 'obsidian-dev-utils/object-utils';
-import { initI18N } from 'obsidian-dev-utils/obsidian/i18n/i18n';
+import {
+  initI18N,
+  t
+} from 'obsidian-dev-utils/obsidian/i18n/i18n';
 import { confirm } from 'obsidian-dev-utils/obsidian/modals/confirm';
 import { SettingEx } from 'obsidian-dev-utils/obsidian/setting-ex';
 import { strictProxy } from 'obsidian-dev-utils/strict-proxy';
@@ -79,8 +82,8 @@ vi.mock('@obsidian-typings/obsidian-public-latest/implementations', async (impor
 const DEBOUNCE_REVALIDATION_TEST_TIMEOUT_IN_MILLISECONDS = 30_000;
 
 // Every declared row across the inline Core group and the eight sub-pages, guarding against a whole section being dropped when rows are moved between pages.
-// 31 = 30 setting rows + the overlap banner row that rides at the top.
-const EXPECTED_ROW_COUNT = 31;
+// 32 = 31 setting rows (including extractBase64Images) + the overlap banner row that rides at the top.
+const EXPECTED_ROW_COUNT = 32;
 
 const STRICT_PROXY_TARGET_SYMBOL = Symbol.for('strictProxyTarget');
 
@@ -959,7 +962,7 @@ function findMultipleValueComponent(components: CapturedMultipleValueComponent[]
 }
 
 function getResetButton(buttons: ButtonComponentClass[]): ButtonComponentClass {
-  const button = buttons[0];
+  const button = buttons.find((button_) => button_.buttonEl.textContent === t(($) => $.pluginSettingsTab.resetToSampleCustomTokens.title)) ?? buttons[0];
   if (!button) {
     throw new Error('Reset button was not captured.');
   }

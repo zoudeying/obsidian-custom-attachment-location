@@ -53,6 +53,8 @@ import { CollectAttachmentsInCurrentFolderCommandHandler } from './command-handl
 import { CollectAttachmentsInFileCommandHandler } from './command-handlers/collect-attachments-in-file-command-handler.ts';
 import { DeleteUnusedAttachmentsEntireVaultCommandHandler } from './command-handlers/delete-unused-attachments-entire-vault-command-handler.ts';
 import { DeleteUnusedAttachmentsInFileCommandHandler } from './command-handlers/delete-unused-attachments-in-file-command-handler.ts';
+import { ExtractBase64ImagesEntireVaultCommandHandler } from './command-handlers/extract-base64-images-entire-vault-command-handler.ts';
+import { ExtractBase64ImagesInFileCommandHandler } from './command-handlers/extract-base64-images-in-file-command-handler.ts';
 import { GoToAttachmentFolderCommandHandler } from './command-handlers/go-to-attachment-folder-command-handler.ts';
 import { GoToOwningNoteCommandHandler } from './command-handlers/go-to-owning-note-command-handler.ts';
 import { MoveAttachmentToProperFolderCommandHandler } from './command-handlers/move-attachment-to-proper-folder-command-handler.ts';
@@ -165,6 +167,14 @@ vi.mock('./command-handlers/collect-attachments-in-file-command-handler.ts', () 
 
 vi.mock('./command-handlers/delete-unused-attachments-in-file-command-handler.ts', () => ({
   DeleteUnusedAttachmentsInFileCommandHandler: vi.fn()
+}));
+
+vi.mock('./command-handlers/extract-base64-images-entire-vault-command-handler.ts', () => ({
+  ExtractBase64ImagesEntireVaultCommandHandler: vi.fn()
+}));
+
+vi.mock('./command-handlers/extract-base64-images-in-file-command-handler.ts', () => ({
+  ExtractBase64ImagesInFileCommandHandler: vi.fn()
 }));
 
 vi.mock('./command-handlers/go-to-attachment-folder-command-handler.ts', () => ({
@@ -397,6 +407,8 @@ describe('Plugin', () => {
       expect.any(CollectAttachmentsInCurrentFolderCommandHandler),
       expect.any(CollectAttachmentsEntireVaultCommandHandler),
       expect.any(DeleteUnusedAttachmentsEntireVaultCommandHandler),
+      expect.any(ExtractBase64ImagesInFileCommandHandler),
+      expect.any(ExtractBase64ImagesEntireVaultCommandHandler),
       expect.any(MoveAttachmentToProperFolderCommandHandler),
       expect.any(GoToAttachmentFolderCommandHandler),
       expect.any(GoToOwningNoteCommandHandler),
@@ -604,6 +616,8 @@ describe('Plugin', () => {
     expect(DeleteUnusedAttachmentsInFileCommandHandler).toHaveBeenCalledOnce();
     expect(CollectAttachmentsInCurrentFolderCommandHandler).toHaveBeenCalledOnce();
     expect(CollectAttachmentsEntireVaultCommandHandler).toHaveBeenCalledOnce();
+    expect(ExtractBase64ImagesInFileCommandHandler).toHaveBeenCalledOnce();
+    expect(ExtractBase64ImagesEntireVaultCommandHandler).toHaveBeenCalledOnce();
     expect(MoveAttachmentToProperFolderCommandHandler).toHaveBeenCalledOnce();
   });
 
