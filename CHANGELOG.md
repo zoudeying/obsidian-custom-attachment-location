@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 12.1.0
+
+- feat: sync with upstream 12.0.1
+- fix: resolve timeout unhandled error in long-running operations
+- feat: base64 image extraction and windows pasted image support
+
 ## 12.0.1
 
 - test: cover the three unused-attachments-remover paths the gate was short on
