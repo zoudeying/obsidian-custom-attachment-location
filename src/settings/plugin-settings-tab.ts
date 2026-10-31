@@ -24,9 +24,11 @@ import {
   Platform
 } from 'obsidian';
 
+import type { Plugin } from '../plugin.ts';
 import type { PluginSettingsComponent } from './plugin-settings-component.ts';
 import type { PluginSettings } from './plugin-settings.ts';
 
+import { extractBase64ImagesEntireVault } from '../base64-extractor/base64-extractor.ts';
 import { Substitutions } from '../tokens/substitutions.ts';
 import { TOKENIZED_STRING_LANGUAGE } from '../tokens/tokenized-string-language.ts';
 import {
@@ -74,12 +76,14 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
   private readonly getPluginGateComponent: (this: void) => PluginGateComponent;
   // Kept so this plugin can leave ITSELF out of the plugin picker; the base class does not expose `plugin`.
   private readonly ownPluginId: string;
+  private readonly plugin2: Plugin;
   private readonly pluginSettingsComponent2: PluginSettingsComponent;
 
   public constructor(params: PluginSettingsTabConstructorParams) {
     super(params);
     this.getPluginGateComponent = params.getPluginGateComponent;
     this.ownPluginId = params.plugin.manifest.id;
+    this.plugin2 = params.plugin as Plugin;
     this.pluginSettingsComponent2 = params.pluginSettingsComponent;
   }
 
@@ -632,6 +636,22 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
 
   private getImagesItems(): SettingDefinitionRender[] {
     return [
+      this.settingEx({
+        desc: t(($) => $.pluginSettingsTab.extractBase64Images.description.part1),
+        name: t(($) => $.pluginSettingsTab.extractBase64Images.name),
+        render: (setting) => {
+          setting.addButton((button) => {
+            button
+              .setButtonText(t(($) => $.pluginSettingsTab.extractBase64Images.buttonText))
+              .setCta()
+              .onClick(() => {
+                invokeAsyncSafely(async () => {
+                  await extractBase64ImagesEntireVault(this.plugin2);
+                });
+              });
+          });
+        }
+      }),
       this.settingEx({
         desc: createFragment((f) => {
           f.appendText(t(($) => $.pluginSettingsTab.defaultImageSize.description.part1));

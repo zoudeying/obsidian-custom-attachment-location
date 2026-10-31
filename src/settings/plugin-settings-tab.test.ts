@@ -20,7 +20,10 @@ import type {
   ToggleComponent
 } from 'obsidian';
 
-import { initI18N } from '@mnaoumov/obsidian-lib/i18n/i18n';
+import {
+  initI18N,
+  t
+} from '@mnaoumov/obsidian-lib/i18n/i18n';
 import { confirm } from '@mnaoumov/obsidian-lib/modals/confirm';
 import { SettingEx } from '@mnaoumov/obsidian-lib/setting-ex';
 import { noopAsync } from '@mnaoumov/typescript-lib/function';
@@ -77,8 +80,8 @@ vi.mock('@obsidian-typings/obsidian-public-latest/implementations', async (impor
 const DEBOUNCE_REVALIDATION_TEST_TIMEOUT_IN_MILLISECONDS = 30_000;
 
 // Every declared row across the inline Core group and the eight sub-pages, guarding against a whole section being dropped when rows are moved between pages.
-// 42 = 41 setting rows + the overlap banner row that rides at the top.
-const EXPECTED_ROW_COUNT = 42;
+// 43 = 42 setting rows + the overlap banner row that rides at the top.
+const EXPECTED_ROW_COUNT = 43;
 
 const STRICT_PROXY_TARGET_SYMBOL = Symbol.for('strictProxyTarget');
 
@@ -1059,7 +1062,7 @@ function findMultipleValueComponent(components: CapturedMultipleValueComponent[]
 }
 
 function getResetButton(buttons: ButtonComponentClass[]): ButtonComponentClass {
-  const button = buttons[0];
+  const button = buttons.find((button_) => button_.buttonEl.textContent === t(($) => $.pluginSettingsTab.resetToSampleCustomTokens.title)) ?? buttons[0];
   if (!button) {
     throw new Error('Reset button was not captured.');
   }

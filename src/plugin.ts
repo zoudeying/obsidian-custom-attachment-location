@@ -3,6 +3,7 @@ import type {
   PluginDependency,
   PluginGateComponent
 } from '@mnaoumov/obsidian-lib/components/plugin-gate-component';
+import type { PluginNoticeComponent } from '@mnaoumov/obsidian-lib/components/plugin-notice-component';
 import type { TranslationsMap } from '@mnaoumov/obsidian-lib/i18n/i18n';
 import type { PluginApiDeclaration } from '@mnaoumov/obsidian-lib/plugin/plugin-api';
 import type { TAbstractFile } from 'obsidian';
@@ -23,6 +24,7 @@ import { t } from '@mnaoumov/obsidian-lib/i18n/i18n';
 import { PluginBase } from '@mnaoumov/obsidian-lib/plugin/plugin';
 import { PluginEventSourceImpl } from '@mnaoumov/obsidian-lib/plugin/plugin-event-source';
 import { join } from '@mnaoumov/typescript-lib/path';
+import { ensureNonNullable } from '@mnaoumov/typescript-lib/type-guards';
 import { ValueWrapper } from '@mnaoumov/typescript-lib/value-wrapper';
 import {
   Component,
@@ -49,6 +51,8 @@ import { AppSaveAttachmentPatchComponent } from './attachment-saving/app-save-at
 import { ArrayBufferMap } from './attachment-saving/array-buffer-map.ts';
 import { AttachmentSaver } from './attachment-saving/attachment-saver.ts';
 import { ImageManager } from './attachment-saving/image-manager.ts';
+import { ExtractBase64ImagesEntireVaultCommandHandler } from './base64-extractor/extract-base64-images-entire-vault-command-handler.ts';
+import { ExtractBase64ImagesInFileCommandHandler } from './base64-extractor/extract-base64-images-in-file-command-handler.ts';
 import { AttachmentCollector } from './collect/attachment-collector.ts';
 import { AutomaticAttachmentCollectorComponent } from './collect/automatic-attachment-collector-component.ts';
 import { CollectAttachmentsEntireVaultCommandHandler } from './collect/collect-attachments-entire-vault-command-handler.ts';
@@ -91,6 +95,33 @@ import { TokenValidator } from './tokens/token-validator.ts';
 import { createTokenizedStringLanguageComponent } from './tokens/tokenized-string-language.ts';
 
 export class Plugin extends PluginBase {
+  public get abortSignal(): AbortSignal {
+    return this.abortSignalComponent.abortSignal;
+  }
+
+  public get handedOverSettingsComponent(): HandedOverSettingsComponent {
+    return ensureNonNullable(this._handedOverSettingsComponent);
+  }
+
+  public override get pluginNoticeComponent(): PluginNoticeComponent {
+    return super.pluginNoticeComponent;
+  }
+
+  public override set pluginNoticeComponent(value: PluginNoticeComponent) {
+    super.pluginNoticeComponent = value;
+  }
+
+  public override get pluginSettingsComponent(): PluginSettingsComponent {
+    return ensureNonNullable(this._pluginSettingsComponent);
+  }
+
+  public override set pluginSettingsComponent(value: PluginSettingsComponent) {
+    this._pluginSettingsComponent = value;
+    super.pluginSettingsComponent = value;
+  }
+
+  private _handedOverSettingsComponent?: HandedOverSettingsComponent;
+  private _pluginSettingsComponent?: PluginSettingsComponent;
   private attachmentCollector: AttachmentCollector | null = null;
   private pluginApi: null | PluginApiImpl = null;
 
@@ -192,6 +223,7 @@ export class Plugin extends PluginBase {
         app: this.app
       })
     );
+    this._handedOverSettingsComponent = handedOverSettingsComponent;
 
     const pluginSettingsComponent = this.addChild(
       new PluginSettingsComponent({
@@ -434,6 +466,12 @@ export class Plugin extends PluginBase {
       new DeleteUnusedAttachmentsEntireVaultCommandHandler({
         bulkOperationCommitComponent,
         unusedAttachmentsRemover
+      }),
+      new ExtractBase64ImagesInFileCommandHandler({
+        plugin: this
+      }),
+      new ExtractBase64ImagesEntireVaultCommandHandler({
+        plugin: this
       }),
       new MoveAttachmentToProperFolderCommandHandler({
         abortSignalComponent: this.abortSignalComponent,

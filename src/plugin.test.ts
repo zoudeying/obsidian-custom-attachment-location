@@ -57,6 +57,8 @@ import { AppSaveAttachmentPatchComponent } from './attachment-saving/app-save-at
 import { ArrayBufferMap } from './attachment-saving/array-buffer-map.ts';
 import { AttachmentSaver } from './attachment-saving/attachment-saver.ts';
 import { ImageManager } from './attachment-saving/image-manager.ts';
+import { ExtractBase64ImagesEntireVaultCommandHandler } from './base64-extractor/extract-base64-images-entire-vault-command-handler.ts';
+import { ExtractBase64ImagesInFileCommandHandler } from './base64-extractor/extract-base64-images-in-file-command-handler.ts';
 import { AttachmentCollector } from './collect/attachment-collector.ts';
 import { CollectAttachmentsEntireVaultCommandHandler } from './collect/collect-attachments-entire-vault-command-handler.ts';
 import { CollectAttachmentsInCurrentFolderCommandHandler } from './collect/collect-attachments-in-current-folder-command-handler.ts';
@@ -419,6 +421,8 @@ describe('Plugin', () => {
       expect.any(CollectAttachmentsInCurrentFolderCommandHandler),
       expect.any(CollectAttachmentsEntireVaultCommandHandler),
       expect.any(DeleteUnusedAttachmentsEntireVaultCommandHandler),
+      expect.any(ExtractBase64ImagesInFileCommandHandler),
+      expect.any(ExtractBase64ImagesEntireVaultCommandHandler),
       expect.any(MoveAttachmentToProperFolderCommandHandler),
       expect.any(GoToAttachmentFolderCommandHandler),
       expect.any(GoToOwningNoteCommandHandler),
