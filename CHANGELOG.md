@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## 17.1.0
+
+- feat: rebase custom base64 image extraction and windows pasted image naming on upstream 17.0.0
+- feat: integrate base64 image extractor with @mnaoumov/obsidian-lib architecture
+
 ## 17.0.0
 
 - test(demo-vault): stop the startup script loading the rename handler a second time
