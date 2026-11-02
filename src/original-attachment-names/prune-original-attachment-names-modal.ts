@@ -19,6 +19,7 @@ import {
   showModal
 } from '@mnaoumov/obsidian-lib/modals/modal';
 import { convertAsyncToSync } from '@mnaoumov/typescript-lib/async';
+import { castTo } from '@mnaoumov/typescript-lib/object-utils';
 import { ButtonComponent } from 'obsidian';
 
 import type { OriginalAttachmentNamesComponent } from './original-attachment-names-component.ts';
@@ -56,6 +57,11 @@ export interface ShowPruneOriginalAttachmentNamesModalParams {
    * The store to prune.
    */
   readonly originalAttachmentNamesComponent: OriginalAttachmentNamesComponent;
+}
+
+interface LegacyDestructiveButton {
+  readonly setDestructive?: (this: ButtonComponent) => ButtonComponent;
+  readonly setWarning?: (this: ButtonComponent) => ButtonComponent;
 }
 
 interface PruneOriginalAttachmentNamesModalConstructorParams extends ShowPruneOriginalAttachmentNamesModalParams {
@@ -101,9 +107,8 @@ class PruneOriginalAttachmentNamesModal extends ModalBase<PruneOriginalAttachmen
         });
     }
 
-    new ButtonComponent(buttonsEl)
+    const forgetAllButton = new ButtonComponent(buttonsEl)
       .setButtonText(t(($) => $.originalAttachmentNames.pruneModal.forgetAll))
-      .setDestructive()
       .setDisabled(this.originalAttachmentNamesComponent.size === 0)
       .onClick(convertAsyncToSync(async () => {
         if (!await isForgetAllConfirmed(this.app, this.originalAttachmentNamesComponent.size)) {
@@ -113,6 +118,7 @@ class PruneOriginalAttachmentNamesModal extends ModalBase<PruneOriginalAttachmen
         this.choice = PruneOriginalAttachmentNamesChoice.ForgetAll;
         this.close();
       }));
+    setButtonDestructive(forgetAllButton);
 
     new ButtonComponent(buttonsEl)
       .setButtonText(t(($) => $.obsidianLib.buttons.cancel))
@@ -155,4 +161,14 @@ export async function showPruneOriginalAttachmentNamesModal(params: ShowPruneOri
       promiseResolve
     })
   );
+}
+
+function setButtonDestructive(button: ButtonComponent): ButtonComponent {
+  const legacyButton = castTo<LegacyDestructiveButton>(button);
+  if (typeof legacyButton.setDestructive === 'function') {
+    legacyButton.setDestructive.call(button);
+  } else if (typeof legacyButton.setWarning === 'function') {
+    legacyButton.setWarning.call(button);
+  }
+  return button;
 }

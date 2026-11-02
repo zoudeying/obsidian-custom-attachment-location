@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## 17.1.1
+
+- feat: add imperative displayLegacy fallback for Obsidian < 1.13 and lower minAppVersion to 1.12.0
+- fix: polyfill ButtonComponent.setDestructive fallback to setWarning on Obsidian < 1.13
+
 ## 17.1.0
 
 - feat: rebase custom base64 image extraction and windows pasted image naming on upstream 17.0.0

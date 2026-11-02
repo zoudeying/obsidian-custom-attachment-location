@@ -50,6 +50,19 @@ export const configs: Linter.Config[] = defineEslintConfigs({
         }
       },
       {
+        files: [
+          'src/settings/**'
+        ],
+        rules: {
+          /**
+           * Settings use Obsidian 1.13 declarative settings (SettingDefinitionItem) for modern Obsidian,
+           * while providing a complete imperative displayLegacy() fallback and runtime feature detection
+           * for Obsidian < 1.13 (e.g. 1.12.0). Waived here so minAppVersion can be 1.12.0.
+           */
+          'obsidianmd/no-unsupported-api': 'off'
+        }
+      },
+      {
         files: [ObsidianPluginRepoPaths.ManifestJson],
         rules: {
           /**

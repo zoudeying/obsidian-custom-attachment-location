@@ -4,8 +4,10 @@ import type {
   PluginSettingsTabBaseConstructorParams
 } from '@mnaoumov/obsidian-lib/plugin/plugin-settings-tab';
 import type {
+  ButtonComponent,
   SettingDefinitionItem,
   SettingDefinitionRender,
+  SettingGroup,
   TextComponent
 } from 'obsidian';
 import type { ConditionalKeys } from 'type-fest';
@@ -18,10 +20,13 @@ import {
   convertAsyncToSync,
   invokeAsyncSafely
 } from '@mnaoumov/typescript-lib/async';
+import { castTo } from '@mnaoumov/typescript-lib/object-utils';
 import {
   debounce,
   normalizePath,
-  Platform
+  Platform,
+  PluginSettingTab,
+  Setting
 } from 'obsidian';
 
 import type { Plugin } from '../plugin.ts';
@@ -57,6 +62,31 @@ const bindOptionsWithTrim: BindOptionsExtended<PluginSettings, string, Condition
   shouldShowPlaceholderForDefaultValues: false
 };
 
+interface DeclaredItemGroupOrPage {
+  readonly desc?: DocumentFragment | string;
+  readonly heading?: string;
+  readonly items?: SettingDefinitionItem[];
+  readonly name?: string;
+}
+
+interface DeclaredItemRow {
+  readonly desc?: DocumentFragment | string;
+  readonly disabled?: (() => boolean) | boolean;
+  readonly name?: DocumentFragment | string;
+  readonly render: (setting: Setting, group: null | SettingGroup) => unknown;
+  readonly visible?: (() => boolean) | boolean;
+}
+
+interface LegacyDestructiveButton {
+  readonly setDestructive?: (this: ButtonComponent) => ButtonComponent;
+  readonly setWarning?: (this: ButtonComponent) => ButtonComponent;
+}
+
+interface LegacyPluginSettingTab {
+  readonly refreshDomState?: (this: PluginSettingTab) => void;
+  readonly update?: (this: PluginSettingTab) => void;
+}
+
 interface PluginSettingsTabConstructorParams extends PluginSettingsTabBaseConstructorParams<PluginSettings> {
   /**
    * Reaches the plugin's gate, LAZILY.
@@ -87,6 +117,13 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
     this.pluginSettingsComponent2 = params.pluginSettingsComponent;
   }
 
+  public override displayLegacy(): void {
+    super.displayLegacy();
+    this.containerEl.empty();
+    this.pluginSettingsComponent2.shouldDebounceCustomTokensValidation = true;
+    this.renderDeclaredItemsImperatively(this.containerEl, this.getSettingDefinitionItems());
+  }
+
   public override hide(): void {
     super.hide();
     this.pluginSettingsComponent2.shouldDebounceCustomTokensValidation = false;
@@ -94,6 +131,24 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
     invokeAsyncSafely(async () => {
       await this.pluginSettingsComponent2.revalidate();
     });
+  }
+
+  public override refreshDomState(): void {
+    const superRefreshDomState = castTo<LegacyPluginSettingTab>(PluginSettingTab.prototype).refreshDomState;
+    if (typeof superRefreshDomState === 'function') {
+      superRefreshDomState.call(this);
+    } else if (this.isOpen) {
+      this.displayLegacy();
+    }
+  }
+
+  public override update(): void {
+    const superUpdate = castTo<LegacyPluginSettingTab>(PluginSettingTab.prototype).update;
+    if (typeof superUpdate === 'function') {
+      superUpdate.call(this);
+    } else if (this.isOpen) {
+      this.displayLegacy();
+    }
   }
 
   protected override getSettingDefinitionItems(): SettingDefinitionItem[] {
@@ -606,7 +661,7 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
         render: (setting) => {
           setting.addButton((button) => {
             button.setButtonText(t(($) => $.pluginSettingsTab.resetToSampleCustomTokens.title));
-            button.setDestructive();
+            setButtonDestructive(button);
             button.onClick(convertAsyncToSync(async () => {
               if (
                 (this.pluginSettingsComponent.settings.customTokensStr === SAMPLE_CUSTOM_TOKENS) || (this.pluginSettingsComponent.settings.customTokensStr !== '' && !await confirm({
@@ -1271,6 +1326,42 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
       })
     ];
   }
+
+  private renderDeclaredItemsImperatively(containerEl: HTMLElement, items: SettingDefinitionItem[]): void {
+    for (const item of items) {
+      if ('items' in item && Array.isArray(item.items)) {
+        const groupOrPage = castTo<DeclaredItemGroupOrPage>(item);
+        const heading = groupOrPage.heading ?? groupOrPage.name ?? '';
+        if (heading) {
+          const headingSetting = new Setting(containerEl).setHeading().setName(heading);
+          if (groupOrPage.desc) {
+            headingSetting.setDesc(groupOrPage.desc);
+          }
+        }
+        if (groupOrPage.items) {
+          this.renderDeclaredItemsImperatively(containerEl, groupOrPage.items);
+        }
+      } else if ('render' in item && typeof item.render === 'function') {
+        const row = castTo<DeclaredItemRow>(item);
+        const isVisible = typeof row.visible === 'function' ? row.visible() : row.visible !== false;
+        if (!isVisible) {
+          continue;
+        }
+        const setting = new Setting(containerEl);
+        if (row.name) {
+          setting.setName(row.name);
+        }
+        if (row.desc) {
+          setting.setDesc(row.desc);
+        }
+        row.render(setting, castTo<SettingGroup>(null));
+        const isDisabled = typeof row.disabled === 'function' ? row.disabled() : row.disabled === true;
+        if (isDisabled) {
+          setting.setDisabled(true);
+        }
+      }
+    }
+  }
 }
 
 /**
@@ -1324,6 +1415,16 @@ function handleWhitespace(text: TextComponent): void {
 
 function restoreSpaceCharacter($string: string): string {
   return $string.replaceAll(VISIBLE_SPACE_CHARACTER, ' ');
+}
+
+function setButtonDestructive(button: ButtonComponent): ButtonComponent {
+  const legacyButton = castTo<LegacyDestructiveButton>(button);
+  if (typeof legacyButton.setDestructive === 'function') {
+    legacyButton.setDestructive.call(button);
+  } else if (typeof legacyButton.setWarning === 'function') {
+    legacyButton.setWarning.call(button);
+  }
+  return button;
 }
 
 function showSpaceCharacter($string: string): string {

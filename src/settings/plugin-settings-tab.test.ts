@@ -661,6 +661,13 @@ describe('PluginSettingsTab', () => {
     }).not.toThrow();
   });
 
+  it('should render items imperatively when displayLegacy is called (Obsidian < 1.13 fallback)', async () => {
+    const { tab } = await createTab();
+    tab.containerEl.empty();
+    tab.displayLegacy();
+    expect(tab.containerEl.children.length).toBeGreaterThan(0);
+  });
+
   it('should re-evaluate the predicates when the download-network-images toggle changes', async () => {
     const { tab, toggles } = await createTab();
 
