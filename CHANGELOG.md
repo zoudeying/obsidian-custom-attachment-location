@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 17.5.0
+
+- feat: add automatic base64 image extraction on note create and update
+- feat: add settings toggle to control automatic base64 extraction
+- perf: add 800ms debounce and fast substring guard (< 0.02ms) to prevent typing lag
+- feat: support both Markdown and HTML table base64 image formats
+
 ## 17.1.1
 
 - feat: add imperative displayLegacy fallback for Obsidian < 1.13 and lower minAppVersion to 1.12.0
