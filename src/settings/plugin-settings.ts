@@ -226,6 +226,14 @@ export class PluginSettings {
   public shouldDeduplicateIdenticalAttachments = false;
 
   /**
+   * Whether embedded Base64 images are automatically extracted and converted to attachments
+   * when notes are created or modified.
+   *
+   * Off by default.
+   */
+  public shouldExtractBase64ImagesAutomatically = false;
+
+  /**
    * Whether a new attachment goes wherever Obsidian's own *Default location for new attachments* says.
    *
    * On, {@link attachmentFolderPath} is not consulted at all: the folder is Obsidian's setting, resolved the

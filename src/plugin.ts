@@ -51,6 +51,7 @@ import { AppSaveAttachmentPatchComponent } from './attachment-saving/app-save-at
 import { ArrayBufferMap } from './attachment-saving/array-buffer-map.ts';
 import { AttachmentSaver } from './attachment-saving/attachment-saver.ts';
 import { ImageManager } from './attachment-saving/image-manager.ts';
+import { AutomaticBase64ExtractorComponent } from './base64-extractor/automatic-base64-extractor-component.ts';
 import { ExtractBase64ImagesEntireVaultCommandHandler } from './base64-extractor/extract-base64-images-entire-vault-command-handler.ts';
 import { ExtractBase64ImagesInFileCommandHandler } from './base64-extractor/extract-base64-images-in-file-command-handler.ts';
 import { AttachmentCollector } from './collect/attachment-collector.ts';
@@ -387,6 +388,14 @@ export class Plugin extends PluginBase {
       new AutomaticAttachmentCollectorComponent({
         app: this.app,
         attachmentCollector,
+        pluginSettingsComponent
+      })
+    );
+
+    this.addChild(
+      new AutomaticBase64ExtractorComponent({
+        app: this.app,
+        plugin: this,
         pluginSettingsComponent
       })
     );

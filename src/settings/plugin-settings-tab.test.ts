@@ -80,8 +80,8 @@ vi.mock('@obsidian-typings/obsidian-public-latest/implementations', async (impor
 const DEBOUNCE_REVALIDATION_TEST_TIMEOUT_IN_MILLISECONDS = 30_000;
 
 // Every declared row across the inline Core group and the eight sub-pages, guarding against a whole section being dropped when rows are moved between pages.
-// 43 = 42 setting rows + the overlap banner row that rides at the top.
-const EXPECTED_ROW_COUNT = 43;
+// 44 = 43 setting rows + the overlap banner row that rides at the top.
+const EXPECTED_ROW_COUNT = 44;
 
 const STRICT_PROXY_TARGET_SYMBOL = Symbol.for('strictProxyTarget');
 

@@ -15,6 +15,7 @@ export const defaultTranslations = {
     }
   },
   base64Extractor: {
+    autoExtractedNotice: 'Extracted {{count}} base64 image(s) in \'{{noteFileName}}\'.',
     confirm: {
       part1: 'Do you want to extract base64-encoded images to attachments for all notes in folders recursively?',
       part2: 'This operation cannot be undone.'
@@ -647,6 +648,10 @@ export const defaultTranslations = {
     shouldDeduplicateIdenticalAttachments: {
       description: 'When an attachment is collected, moved to its proper folder, or renamed after another plugin created it, and its destination already holds a file with exactly the same content, keep only that file: every link to the incoming attachment is pointed at it, and the incoming attachment is moved to the trash. A destination holding different content still gets the duplicate-name suffix.',
       name: 'Deduplicate identical attachments'
+    },
+    shouldExtractBase64ImagesAutomatically: {
+      description: 'Automatically extract embedded base64 images and convert them into physical attachments when notes are created or updated.',
+      name: 'Extract base64 images automatically'
     },
     shouldFollowObsidianAttachmentLocation: {
       description: 'If enabled, new attachments go wherever Obsidian\'s own Files and links > Default location for new attachments says, and Location for new attachments below is not used. The file name settings still apply.',

@@ -22,10 +22,31 @@ import {
 
 import type { Plugin } from '../plugin.ts';
 
+export interface ExtractBase64ImagesInFileOptions {
+  readonly abortSignal?: AbortSignal;
+  readonly shouldShowNotice?: boolean;
+}
+
+interface Base64ImageTarget {
+  readonly altText: string;
+  readonly base64Data: string;
+  readonly extension: string;
+  readonly fullMatch: string;
+  readonly titleAttr: string;
+}
+
+interface HtmlImgAttributes {
+  readonly altText: string;
+  readonly titleAttr: string;
+}
+
 interface ProcessedMatchResult {
   readonly fullMatch: string;
   readonly markdownLink: null | string;
 }
+
+const HTML_IMG_BASE64_REGEX = /<img\s+[^>]*?src\s*=\s*['"](?<fullData>data:(?:image\/(?<extension>[a-zA-Z0-9.\-+]+)|application\/octet-stream)[^,]*?;base64,(?<base64Data>[^'"]+))['"][^>]*?\/?>/gi;
+const MARKDOWN_BASE64_REGEX = /!\[(?<altText>[\s\S]*?)\]\(\s*<?(?<fullData>data:(?:image\/(?<extension>[a-zA-Z0-9.\-+]+)|application\/octet-stream)[^,]*?;base64,(?<base64Data>[^)'"]+))>?(?:\s+['"](?<titleAttr>[^'"]*)['"])?\s*\)/g;
 
 export async function extractBase64ImagesEntireVault(plugin: Plugin): Promise<void> {
   const canExtractBase64Images = await confirm({
@@ -92,6 +113,25 @@ export async function extractBase64ImagesInAbstractFiles(plugin: Plugin, abstrac
   });
 }
 
+export async function extractBase64ImagesInFile(
+  plugin: Plugin,
+  note: TFile,
+  options?: ExtractBase64ImagesInFileOptions
+): Promise<number> {
+  const abortSignal = options?.abortSignal ?? plugin.abortSignal;
+  const shouldShowNotice = options?.shouldShowNotice ?? false;
+
+  if (plugin.handedOverSettingsComponent.isPathIgnored(note.path)) {
+    return 0;
+  }
+
+  const count = await extractBase64Images(plugin, note, abortSignal);
+  if (count > 0 && shouldShowNotice) {
+    new Notice(t(($) => $.base64Extractor.autoExtractedNotice, { count, noteFileName: note.basename }));
+  }
+  return count;
+}
+
 function base64ToArrayBuffer(base64: string): ArrayBuffer {
   const standardizedBase64 = base64.replaceAll('-', '+').replaceAll('_', '/');
   const binaryString = window.atob(standardizedBase64);
@@ -103,6 +143,29 @@ function base64ToArrayBuffer(base64: string): ArrayBuffer {
   return bytes.buffer;
 }
 
+function collectBase64ImageTargets(content: string): Base64ImageTarget[] {
+  const markdownTargets = Array.from(content.matchAll(MARKDOWN_BASE64_REGEX), (match): Base64ImageTarget => ({
+    altText: match.groups?.['altText'] ?? '',
+    base64Data: (match.groups?.['base64Data'] ?? '').replaceAll(/\s/g, ''),
+    extension: match.groups?.['extension'] ?? 'png',
+    fullMatch: match[0],
+    titleAttr: match.groups?.['titleAttr'] ?? ''
+  }));
+
+  const htmlTargets = Array.from(content.matchAll(HTML_IMG_BASE64_REGEX), (match): Base64ImageTarget => {
+    const { altText, titleAttr } = parseHtmlImgAttributes(match[0]);
+    return {
+      altText,
+      base64Data: (match.groups?.['base64Data'] ?? '').replaceAll(/\s/g, ''),
+      extension: match.groups?.['extension'] ?? 'png',
+      fullMatch: match[0],
+      titleAttr
+    };
+  });
+
+  return [...markdownTargets, ...htmlTargets];
+}
+
 async function extractBase64Images(
   plugin: Plugin,
   note: TFile,
@@ -112,20 +175,20 @@ async function extractBase64Images(
   const app = plugin.app;
 
   let content = await app.vault.read(note);
-  // Support variations like charset, newlines, URL-safe base64, complex mime types, and malformed base64 strings
-  const base64Regex = /!\[(?<altText>[\s\S]*?)\]\(\s*<?(?<fullData>data:(?:image\/(?<extension>[a-zA-Z0-9.\-+]+)|application\/octet-stream)[^,]*?;base64,(?<base64Data>[^)'"]+))>?(?:\s+['"](?<titleAttr>[^'"]*)['"])?\s*\)/g;
-
-  let isModified = false;
-  const matches = [...content.matchAll(base64Regex)];
-
-  if (matches.length === 0) {
+  if (!content.includes('data:image/') && !content.includes('data:application/octet-stream')) {
     return 0;
   }
 
+  const targets = collectBase64ImageTargets(content);
+  if (targets.length === 0) {
+    return 0;
+  }
+
+  let isModified = false;
   const results: ProcessedMatchResult[] = [];
-  for (const match of matches) {
+  for (const target of targets) {
     abortSignal.throwIfAborted();
-    const result = await processBase64Match(app, note, match, abortSignal);
+    const result = await processBase64Target(app, note, target, abortSignal);
     results.push(result);
   }
 
@@ -236,18 +299,27 @@ async function extractBase64ImagesInAbstractFilesImpl(
   }
 }
 
-async function processBase64Match(
+function parseHtmlImgAttributes(html: string): HtmlImgAttributes {
+  const altMatch = /\balt\s*=\s*['"](?<alt>[^'"]*)['"]/i.exec(html);
+  const titleMatch = /\btitle\s*=\s*['"](?<title>[^'"]*)['"]/i.exec(html);
+  return {
+    altText: altMatch?.groups?.['alt'] ?? '',
+    titleAttr: titleMatch?.groups?.['title'] ?? ''
+  };
+}
+
+async function processBase64Target(
   app: App,
   note: TFile,
-  match: RegExpMatchArray,
+  target: Base64ImageTarget,
   abortSignal: AbortSignal
 ): Promise<ProcessedMatchResult> {
   abortSignal.throwIfAborted();
-  const fullMatch = match[0];
-  const altText = match.groups?.['altText'] ?? '';
-  let extension = match.groups?.['extension'] ?? 'png';
-  const base64Data = (match.groups?.['base64Data'] ?? '').replaceAll(/\s/g, '');
-  const titleAttr = match.groups?.['titleAttr'] ?? '';
+  const fullMatch = target.fullMatch;
+  const altText = target.altText;
+  let extension = target.extension;
+  const base64Data = target.base64Data;
+  const titleAttr = target.titleAttr;
 
   if (extension.toLowerCase() === 'jpeg') {
     extension = 'jpg';

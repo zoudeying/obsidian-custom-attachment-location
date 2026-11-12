@@ -708,6 +708,18 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginSettings> {
         }
       }),
       this.settingEx({
+        desc: t(($) => $.pluginSettingsTab.shouldExtractBase64ImagesAutomatically.description),
+        name: t(($) => $.pluginSettingsTab.shouldExtractBase64ImagesAutomatically.name),
+        render: (setting) => {
+          setting.addToggle((toggle) => {
+            this.bind({
+              propertyName: 'shouldExtractBase64ImagesAutomatically',
+              valueComponent: toggle
+            });
+          });
+        }
+      }),
+      this.settingEx({
         desc: createFragment((f) => {
           f.appendText(t(($) => $.pluginSettingsTab.defaultImageSize.description.part1));
           f.createEl('br');
